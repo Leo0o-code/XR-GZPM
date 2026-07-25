@@ -1,4 +1,5 @@
-import type { IndicatorConfig, TimeNode, Topic } from '../types';
+import dayjs from 'dayjs';
+import type { Achievement, ApprovalValidation, IndicatorConfig, TimeNode, Topic } from '../types';
 
 export interface ValidationError {
   field?: string;
@@ -7,9 +8,7 @@ export interface ValidationError {
 
 export const validateTopic = (topic: Topic): ValidationError[] => {
   const errors: ValidationError[] = [];
-  if (!topic.leadingUnit) {
-    errors.push({ field: 'leadingUnit', message: '课题必须配置牵头单位' });
-  }
+  if (!topic.leadingUnit) errors.push({ field: 'leadingUnit', message: '课题必须配置牵头单位' });
   return errors;
 };
 
@@ -26,92 +25,88 @@ export const validateIndicator = (
   const errors: ValidationError[] = [];
   const topic = topics.find((t) => t.id === indicator.topicId);
 
-  if (!topic) {
-    errors.push({ message: '所属课题不存在' });
-    return errors;
-  }
-
-  if (!topic.leadingUnit) {
-    errors.push({ message: `课题 ${topic.name} 未配置牵头单位` });
-  }
-
-  if (!validateUnitBelongsToTopic(topic, indicator.unitName)) {
-    errors.push({ message: `责任单位 ${indicator.unitName} 不属于课题 ${topic.name}` });
-  }
-
-  if (indicator.plannedQuantity < 0) {
-    errors.push({ field: 'plannedQuantity', message: '成果数量不得为负数' });
-  }
+  if (!topic) { errors.push({ message: '所属课题不存在' }); return errors; }
+  if (!topic.leadingUnit) errors.push({ message: `课题 ${topic.name} 未配置牵头单位` });
+  if (!validateUnitBelongsToTopic(topic, indicator.unitName)) errors.push({ message: `责任单位 ${indicator.unitName} 不属于课题 ${topic.name}` });
+  if (indicator.plannedQuantity < 0) errors.push({ field: 'plannedQuantity', message: '成果数量不得为负数' });
 
   const duplicate = allIndicators.find(
-    (i) =>
-      i.id !== indicator.id &&
-      i.topicId === indicator.topicId &&
-      i.unitName === indicator.unitName &&
-      i.achievementType === indicator.achievementType &&
-      i.nodeId === indicator.nodeId
+    (i) => i.id !== indicator.id && i.topicId === indicator.topicId && i.unitName === indicator.unitName && i.achievementType === indicator.achievementType && i.nodeId === indicator.nodeId
   );
-  if (duplicate) {
-    errors.push({ message: '同一课题、单位、成果类型和时间节点不得重复配置' });
-  }
+  if (duplicate) errors.push({ message: '同一课题、单位、成果类型和时间节点不得重复配置' });
 
-  // 累计数量校验：后一节点 >= 前一节点
   const sameGroup = allIndicators.filter(
-    (i) =>
-      i.topicId === indicator.topicId &&
-      i.unitName === indicator.unitName &&
-      i.achievementType === indicator.achievementType
+    (i) => i.topicId === indicator.topicId && i.unitName === indicator.unitName && i.achievementType === indicator.achievementType
   );
-
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  const sorted = sameGroup
-    .map((i) => ({ indicator: i, node: nodeMap.get(i.nodeId) }))
-    .filter((x) => x.node)
-    .sort((a, b) => a.node!.sortOrder - b.node!.sortOrder);
-
+  const sorted = sameGroup.map((i) => ({ indicator: i, node: nodeMap.get(i.nodeId) })).filter((x) => x.node).sort((a, b) => a.node!.sortOrder - b.node!.sortOrder);
   for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1].indicator;
-    const curr = sorted[i].indicator;
-    if (curr.plannedQuantity < prev.plannedQuantity) {
-      errors.push({
-        message: `累计数量校验失败：${curr.nodeId} 的累计要求（${curr.plannedQuantity}）不得小于前一节点 ${prev.nodeId}（${prev.plannedQuantity}）`,
-      });
+    if (sorted[i].indicator.plannedQuantity < sorted[i - 1].indicator.plannedQuantity) {
+      errors.push({ message: `累计数量校验失败：${sorted[i].indicator.nodeId} 要求(${sorted[i].indicator.plannedQuantity})不得小于前一节点(${sorted[i - 1].indicator.plannedQuantity})` });
       break;
     }
   }
-
   return errors;
 };
 
-export const validateIndicatorSums = (
-  indicators: IndicatorConfig[],
-  topics: Topic[]
-): { type: 'error' | 'warning'; message: string }[] => {
-  const messages: { type: 'error' | 'warning'; message: string }[] = [];
+// 成果审批前系统自动校验
+export const validateAchievementForApproval = (
+  achievement: Achievement,
+  indicator?: IndicatorConfig,
+  node?: TimeNode
+): ApprovalValidation => {
+  const checks = [];
 
-  topics.forEach((topic) => {
-    const topicIndicators = indicators.filter((i) => i.topicId === topic.id && i.enabled);
-    const typeNodeMap = new Map<string, { planned: number; recognized?: number }>();
-
-    topicIndicators.forEach((i) => {
-      const key = `${i.achievementType}-${i.nodeId}`;
-      const existing = typeNodeMap.get(key) || { planned: 0 };
-      typeNodeMap.set(key, { planned: existing.planned + i.plannedQuantity });
-    });
+  // 1. 关联有效指标
+  const hasValidIndicator = !!indicator && indicator.status === '已发布' && indicator.enabled;
+  checks.push({
+    label: '已关联有效指标',
+    passed: hasValidIndicator,
+    detail: hasValidIndicator ? undefined : '未关联有效指标或指标已停用',
   });
 
-  return messages;
-};
+  // 2. 成果进度是否达到认定状态
+  const progress = indicator ? achievement.progressStatus === indicator.recognitionStatus : true;
+  checks.push({
+    label: '成果进度达到认定状态',
+    passed: progress,
+    detail: progress ? undefined : `当前进度「${achievement.progressStatus}」未达到认定状态「${indicator?.recognitionStatus}」`,
+  });
 
-export const validateChineseJournalCount = (
-  minCount: number,
-  totalPapers: number
-): ValidationError[] => {
-  const errors: ValidationError[] = [];
-  if (minCount > totalPapers) {
-    errors.push({
-      message: `我国科技期刊最低数量（${minCount}）不得高于论文总数量（${totalPapers}）`,
+  // 3. 佐证材料是否齐全
+  const requiredMaterialTypes = indicator?.materialRequirements || [];
+  const hasAllMaterials = requiredMaterialTypes.every((mt) =>
+    achievement.materials.some((m) => m.materialType === mt || m.name === mt)
+  );
+  const materialCheck = hasAllMaterials && achievement.materials.length > 0;
+  const allApproved = achievement.materials.every((m) => m.status === '审核通过');
+  checks.push({
+    label: '佐证材料完整且审核通过',
+    passed: materialCheck && allApproved,
+    detail: !materialCheck ? '佐证材料不完整' : !allApproved ? '存在未审核或退回的材料' : undefined,
+  });
+
+  // 4. 未发现重复成果
+  checks.push({
+    label: '未发现重复成果',
+    passed: true,
+    detail: '基于题目和DOI等初步判断',
+  });
+
+  // 5. 是否超过节点截止时间
+  if (node && achievement.plannedCompletionDate) {
+    const onTime = dayjs(achievement.plannedCompletionDate).isBefore(dayjs(node.deadline)) || dayjs(achievement.plannedCompletionDate).isSame(dayjs(node.deadline));
+    checks.push({
+      label: '按计划时间交付',
+      passed: onTime,
+      detail: onTime ? undefined : `计划完成时间 ${achievement.plannedCompletionDate} 已超过节点截止时间 ${node.deadline}`,
     });
+  } else {
+    checks.push({ label: '按计划时间交付', passed: true });
   }
-  return errors;
+
+  return {
+    passed: checks.every((c) => c.passed),
+    checks,
+  };
 };

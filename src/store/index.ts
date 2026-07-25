@@ -4,6 +4,7 @@ import type {
   Achievement,
   ArchiveCategory,
   ArchiveMaterial,
+  ArchiveRequirement,
   ChineseJournalConfig,
   IndicatorConfig,
   Project,
@@ -16,6 +17,7 @@ import {
   MOCK_ACHIEVEMENTS,
   MOCK_ARCHIVE_CATEGORIES,
   MOCK_ARCHIVE_MATERIALS,
+  MOCK_ARCHIVE_REQUIREMENTS,
   MOCK_CHINESE_JOURNAL_CONFIG,
   MOCK_INDICATORS,
   MOCK_PROJECT,
@@ -36,43 +38,42 @@ interface AppState {
   achievements: Achievement[];
   archiveCategories: ArchiveCategory[];
   archiveMaterials: ArchiveMaterial[];
+  archiveRequirements: ArchiveRequirement[];
 
-  // topics
   addTopic: (topic: Topic) => void;
   updateTopic: (id: string, updates: Partial<Topic>) => void;
 
-  // nodes
   addNode: (node: TimeNode) => void;
   updateNode: (id: string, updates: Partial<TimeNode>) => void;
   removeNode: (id: string) => void;
 
-  // indicators
   addIndicator: (indicator: IndicatorConfig) => void;
   updateIndicator: (id: string, updates: Partial<IndicatorConfig>, reason: string, operator: string) => void;
   publishIndicator: (id: string, operator: string) => void;
   adjustIndicator: (id: string, updates: Partial<IndicatorConfig>, reason: string, operator: string) => void;
   deactivateIndicator: (id: string, operator: string) => void;
 
-  // chinese journal config
   updateChineseJournalConfig: (updates: Partial<ChineseJournalConfig>) => void;
 
-  // warning rules
   updateWarningRule: (id: string, updates: Partial<WarningRule>) => void;
 
-  // achievements
   addAchievement: (achievement: Achievement) => void;
   updateAchievement: (id: string, updates: Partial<Achievement>) => void;
   submitAchievement: (id: string) => void;
   approveAchievement: (id: string, payload: Partial<Achievement>, approver: string) => void;
+  rejectAchievement: (id: string, reason: string, approver: string) => void;
   returnAchievement: (id: string, reason: string, approver: string) => void;
 
-  // archive
   addArchiveCategory: (category: ArchiveCategory) => void;
   updateArchiveCategory: (id: string, updates: Partial<ArchiveCategory>) => void;
   removeArchiveCategory: (id: string) => void;
   addArchiveMaterial: (material: ArchiveMaterial) => void;
   updateArchiveMaterial: (id: string, updates: Partial<ArchiveMaterial>) => void;
   removeArchiveMaterial: (id: string) => void;
+
+  addArchiveRequirement: (req: ArchiveRequirement) => void;
+  updateArchiveRequirement: (id: string, updates: Partial<ArchiveRequirement>) => void;
+  removeArchiveRequirement: (id: string) => void;
 
   resetToMock: () => void;
 }
@@ -88,6 +89,7 @@ const buildInitialState = () => ({
   achievements: MOCK_ACHIEVEMENTS,
   archiveCategories: MOCK_ARCHIVE_CATEGORIES,
   archiveMaterials: MOCK_ARCHIVE_MATERIALS,
+  archiveRequirements: MOCK_ARCHIVE_REQUIREMENTS,
 });
 
 export const useAppStore = create<AppState>()(
@@ -107,9 +109,7 @@ export const useAppStore = create<AppState>()(
           nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n)),
         })),
       removeNode: (id) =>
-        set((state) => ({
-          nodes: state.nodes.filter((n) => n.id !== id),
-        })),
+        set((state) => ({ nodes: state.nodes.filter((n) => n.id !== id) })),
 
       addIndicator: (indicator) =>
         set((state) => ({ indicators: [...state.indicators, indicator] })),
@@ -150,12 +150,7 @@ export const useAppStore = create<AppState>()(
       },
 
       publishIndicator: (id, operator) => {
-        get().updateIndicator(
-          id,
-          { status: '已发布', effectiveDate: new Date().toISOString().split('T')[0] },
-          '发布配置',
-          operator
-        );
+        get().updateIndicator(id, { status: '已发布', effectiveDate: new Date().toISOString().split('T')[0] }, '发布配置', operator);
       },
 
       adjustIndicator: (id, updates, reason, operator) => {
@@ -163,18 +158,11 @@ export const useAppStore = create<AppState>()(
       },
 
       deactivateIndicator: (id, operator) => {
-        get().updateIndicator(
-          id,
-          { status: '已停用', enabled: false },
-          '停用配置',
-          operator
-        );
+        get().updateIndicator(id, { status: '已停用', enabled: false }, '停用配置', operator);
       },
 
       updateChineseJournalConfig: (updates) =>
-        set((state) => ({
-          chineseJournalConfig: { ...state.chineseJournalConfig, ...updates },
-        })),
+        set((state) => ({ chineseJournalConfig: { ...state.chineseJournalConfig, ...updates } })),
 
       updateWarningRule: (id, updates) =>
         set((state) => ({
@@ -195,12 +183,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           achievements: state.achievements.map((a) =>
             a.id === id
-              ? {
-                  ...a,
-                  status: '已提交',
-                  submittedAt: new Date().toISOString().split('T')[0],
-                  updatedAt: new Date().toISOString().split('T')[0],
-                }
+              ? { ...a, status: '已提交', submittedAt: new Date().toISOString().split('T')[0], updatedAt: new Date().toISOString().split('T')[0] }
               : a
           ),
         })),
@@ -210,14 +193,18 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           achievements: state.achievements.map((a) =>
             a.id === id
-              ? {
-                  ...a,
-                  ...payload,
-                  status: '审批通过',
-                  approver,
-                  approvedAt: today,
-                  updatedAt: today,
-                }
+              ? { ...a, ...payload, status: '审批通过', approver, approvedAt: today, updatedAt: today }
+              : a
+          ),
+        }));
+      },
+
+      rejectAchievement: (id, reason, approver) => {
+        const today = new Date().toISOString().split('T')[0];
+        set((state) => ({
+          achievements: state.achievements.map((a) =>
+            a.id === id
+              ? { ...a, status: '审批不通过', approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false }
               : a
           ),
         }));
@@ -228,46 +215,26 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           achievements: state.achievements.map((a) =>
             a.id === id
-              ? {
-                  ...a,
-                  status: '退回修改',
-                  approvalOpinion: reason,
-                  approver,
-                  approvedAt: today,
-                  updatedAt: today,
-                  countsToIndicator: false,
-                }
+              ? { ...a, status: '退回修改', approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false }
               : a
           ),
         }));
       },
 
-      addArchiveCategory: (category) =>
-        set((state) => ({ archiveCategories: [...state.archiveCategories, category] })),
-      updateArchiveCategory: (id, updates) =>
-        set((state) => ({
-          archiveCategories: state.archiveCategories.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-        })),
-      removeArchiveCategory: (id) =>
-        set((state) => ({
-          archiveCategories: state.archiveCategories.filter((c) => c.id !== id),
-        })),
+      addArchiveCategory: (category) => set((state) => ({ archiveCategories: [...state.archiveCategories, category] })),
+      updateArchiveCategory: (id, updates) => set((state) => ({ archiveCategories: state.archiveCategories.map((c) => (c.id === id ? { ...c, ...updates } : c)) })),
+      removeArchiveCategory: (id) => set((state) => ({ archiveCategories: state.archiveCategories.filter((c) => c.id !== id) })),
 
-      addArchiveMaterial: (material) =>
-        set((state) => ({ archiveMaterials: [...state.archiveMaterials, material] })),
-      updateArchiveMaterial: (id, updates) =>
-        set((state) => ({
-          archiveMaterials: state.archiveMaterials.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-        })),
-      removeArchiveMaterial: (id) =>
-        set((state) => ({
-          archiveMaterials: state.archiveMaterials.filter((m) => m.id !== id),
-        })),
+      addArchiveMaterial: (material) => set((state) => ({ archiveMaterials: [...state.archiveMaterials, material] })),
+      updateArchiveMaterial: (id, updates) => set((state) => ({ archiveMaterials: state.archiveMaterials.map((m) => (m.id === id ? { ...m, ...updates } : m)) })),
+      removeArchiveMaterial: (id) => set((state) => ({ archiveMaterials: state.archiveMaterials.filter((m) => m.id !== id) })),
+
+      addArchiveRequirement: (req) => set((state) => ({ archiveRequirements: [...state.archiveRequirements, req] })),
+      updateArchiveRequirement: (id, updates) => set((state) => ({ archiveRequirements: state.archiveRequirements.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
+      removeArchiveRequirement: (id) => set((state) => ({ archiveRequirements: state.archiveRequirements.filter((r) => r.id !== id) })),
 
       resetToMock: () => set(buildInitialState()),
     }),
-    {
-      name: 'research-achievement-storage-v2',
-    }
+    { name: 'research-achievement-storage-v3' }
   )
 );

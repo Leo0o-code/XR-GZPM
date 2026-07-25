@@ -1,5 +1,6 @@
 import { Card, InputNumber, Space, Switch, Table, Typography } from 'antd';
 import { useAppStore } from '../../store';
+import { WARNING_TYPES } from '../../types';
 import { levelColor, levelLabel } from '../../utils/helpers';
 
 const { Text } = Typography;
@@ -8,7 +9,16 @@ export function WarningRulePage() {
   const { warningRules, updateWarningRule } = useAppStore();
 
   const columns = [
-    { title: '预警类型', dataIndex: 'name', key: 'name', width: 180 },
+    {
+      title: '预警类型',
+      dataIndex: 'name',
+      key: 'name',
+      width: 200,
+      render: (_: string, record: any) => {
+        const wt = WARNING_TYPES.find((w) => w.value === record.type);
+        return wt?.label || record.name;
+      },
+    },
     {
       title: '启用',
       dataIndex: 'enabled',
@@ -28,7 +38,9 @@ export function WarningRulePage() {
         <Space direction="vertical" style={{ width: '100%' }}>
           {record.levels.map((level: any) => (
             <Space key={level.level} style={{ width: '100%' }}>
-              <Text style={{ color: levelColor(level.level), width: 70 }}>{levelLabel(level.level)}</Text>
+              <Text style={{ color: levelColor(level.level), width: 70 }}>
+                {levelLabel(level.level)}
+              </Text>
               <Text>提前天数：</Text>
               <InputNumber
                 min={0}
@@ -47,7 +59,9 @@ export function WarningRulePage() {
                 value={level.completionRateThreshold}
                 onChange={(v) => {
                   const levels = record.levels.map((l: any) =>
-                    l.level === level.level ? { ...l, completionRateThreshold: v } : l
+                    l.level === level.level
+                      ? { ...l, completionRateThreshold: v }
+                      : l
                   );
                   updateWarningRule(record.id, { levels });
                 }}

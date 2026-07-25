@@ -12,7 +12,7 @@ import {
 } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
 import { useAppStore } from '../../store';
-import type { AchievementType, CompletionStats } from '../../types';
+import { ACHIEVEMENT_TYPES, WARNING_TYPES, type AchievementType, type CompletionStats } from '../../types';
 import { aggregateStats, calculateChineseJournalRatio } from '../../utils/stats';
 import { generateWarnings, filterWarnings } from '../../utils/warnings';
 import { exportToExcel } from '../../utils/export';
@@ -24,9 +24,22 @@ const { Option } = Select;
 type ViewType = 'project' | 'topic' | 'unit' | 'node';
 
 export function IndicatorMonitoringPage() {
-  const { topics, nodes, indicators, achievements, chineseJournalConfig, warningRules } = useAppStore();
+  const {
+    topics,
+    nodes,
+    indicators,
+    achievements,
+    chineseJournalConfig,
+    warningRules,
+  } = useAppStore();
+
   const [view, setView] = useState<ViewType>('project');
-  const [filter, setFilter] = useState({ topicId: '', achievementType: undefined as AchievementType | undefined, level: '' });
+  const [filter, setFilter] = useState({
+    topicId: '',
+    achievementType: undefined as AchievementType | undefined,
+    level: '',
+    type: '',
+  });
 
   const topicMap = Object.fromEntries(topics.map((t) => [t.id, t]));
 
@@ -40,12 +53,32 @@ export function IndicatorMonitoringPage() {
     });
   }, [indicators, achievements, nodes, view, topics, filter]);
 
+  // Pass the full warningRules (all 6 types) to generateWarnings
   const warnings = useMemo(
-    () => generateWarnings(indicators, achievements, nodes, chineseJournalConfig, warningRules, topics),
+    () =>
+      generateWarnings(
+        indicators,
+        achievements,
+        nodes,
+        chineseJournalConfig,
+        warningRules,
+        topics
+      ),
     [indicators, achievements, nodes, chineseJournalConfig, warningRules, topics]
   );
 
   const ratioData = calculateChineseJournalRatio(achievements, chineseJournalConfig);
+
+  const filteredWarnings = useMemo(
+    () =>
+      filterWarnings(warnings, {
+        level: filter.level,
+        topicId: filter.topicId,
+        achievementType: filter.achievementType,
+        type: filter.type,
+      }),
+    [warnings, filter]
+  );
 
   const handleExport = () => {
     const rows = stats.map((s) => ({
@@ -62,7 +95,10 @@ export function IndicatorMonitoringPage() {
       完成率: `${(s.completionRate * 100).toFixed(1)}%`,
       剩余天数: daysUntil(s.deadline),
     }));
-    exportToExcel(rows, `指标监控_${view}_${new Date().toISOString().split('T')[0]}`);
+    exportToExcel(
+      rows,
+      `指标监控_${view}_${new Date().toISOString().split('T')[0]}`
+    );
   };
 
   const columns = [
@@ -71,8 +107,10 @@ export function IndicatorMonitoringPage() {
       dataIndex: 'viewKey',
       key: 'viewKey',
       render: (v: string, record: CompletionStats) => {
-        if (view === 'topic') return topicMap[record.topicId!]?.name || record.topicId;
-        if (view === 'unit') return `${topicMap[record.topicId!]?.name || record.topicId} - ${record.unitName}`;
+        if (view === 'topic')
+          return topicMap[record.topicId!]?.name || record.topicId;
+        if (view === 'unit')
+          return `${topicMap[record.topicId!]?.name || record.topicId} - ${record.unitName}`;
         return v;
       },
     },
@@ -87,14 +125,20 @@ export function IndicatorMonitoringPage() {
       title: '完成率',
       dataIndex: 'completionRate',
       key: 'completionRate',
-      render: (v: number) => <Progress percent={Number((v * 100).toFixed(1))} size="small" />,
+      render: (v: number) => (
+        <Progress percent={Number((v * 100).toFixed(1))} size="small" />
+      ),
     },
     {
       title: '剩余天数',
       key: 'daysRemaining',
       render: (_: any, record: CompletionStats) => {
         const days = daysUntil(record.deadline);
-        return <Tag color={days < 0 ? 'red' : days <= 30 ? 'orange' : 'green'}>{days}</Tag>;
+        return (
+          <Tag color={days < 0 ? 'red' : days <= 30 ? 'orange' : 'green'}>
+            {days}
+          </Tag>
+        );
       },
     },
   ];
@@ -117,7 +161,9 @@ export function IndicatorMonitoringPage() {
             onChange={(v) => setFilter({ ...filter, topicId: v })}
           >
             {topics.map((t) => (
-              <Option key={t.id} value={t.id}>{t.name}</Option>
+              <Option key={t.id} value={t.id}>
+                {t.name}
+              </Option>
             ))}
           </Select>
 
@@ -125,14 +171,22 @@ export function IndicatorMonitoringPage() {
             placeholder="成果类型"
             allowClear
             style={{ width: 140 }}
-            onChange={(v) => setFilter({ ...filter, achievementType: v || undefined })}
+            onChange={(v) =>
+              setFilter({ ...filter, achievementType: v || undefined })
+            }
           >
-            {['学术论文', '发明专利', '软件著作权', '标准规范', '人才培养'].map((t) => (
-              <Option key={t} value={t}>{t}</Option>
+            {ACHIEVEMENT_TYPES.map((t) => (
+              <Option key={t} value={t}>
+                {t}
+              </Option>
             ))}
           </Select>
 
-          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+          >
             导出 Excel
           </Button>
         </Space>
@@ -150,23 +204,40 @@ export function IndicatorMonitoringPage() {
         <Space size="large">
           <div>
             <Title level={5}>当前比例</Title>
-            <Tag color={ratioData.ratio !== null && ratioData.ratio >= ratioData.minRequiredRatio ? 'success' : 'warning'}>
-              {ratioData.ratio !== null ? `${ratioData.ratio}%` : '暂无数据'}
+            <Tag
+              color={
+                ratioData.ratio !== null &&
+                ratioData.ratio >= ratioData.minRequiredRatio
+                  ? 'success'
+                  : 'warning'
+              }
+            >
+              {ratioData.ratio !== null
+                ? `${ratioData.ratio}%`
+                : '暂无数据'}
             </Tag>
           </div>
           <div>
             <Title level={5}>预计比例</Title>
             <Tag>
-              {ratioData.projectedRatio !== null ? `${ratioData.projectedRatio}%` : '暂无数据'}
+              {ratioData.projectedRatio !== null
+                ? `${ratioData.projectedRatio}%`
+                : '暂无数据'}
             </Tag>
           </div>
           <div>
             <Title level={5}>最低要求</Title>
-            <Tag>{ratioData.minRequiredRatio}% / {ratioData.minRequiredCount} 篇</Tag>
+            <Tag>
+              {ratioData.minRequiredRatio}% / {ratioData.minRequiredCount} 篇
+            </Tag>
           </div>
           <div>
             <Title level={5}>尚缺</Title>
-            <Tag color={ratioData.gapCount > 0 ? 'error' : 'success'}>{ratioData.gapCount} 篇</Tag>
+            <Tag
+              color={ratioData.gapCount > 0 ? 'error' : 'success'}
+            >
+              {ratioData.gapCount} 篇
+            </Tag>
           </div>
         </Space>
       </Card>
@@ -183,11 +254,26 @@ export function IndicatorMonitoringPage() {
             <Option value="orange">橙色预警</Option>
             <Option value="red">红色预警</Option>
           </Select>
+
+          <Select
+            placeholder="预警类型"
+            allowClear
+            style={{ width: 180 }}
+            onChange={(v) => setFilter({ ...filter, type: v })}
+          >
+            {WARNING_TYPES.map((wt) => (
+              <Option key={wt.value} value={wt.value}>
+                {wt.label}
+              </Option>
+            ))}
+          </Select>
         </Space>
 
         <Space direction="vertical" style={{ width: '100%' }}>
-          {filterWarnings(warnings, filter).length === 0 && <Tag color="success">暂无预警</Tag>}
-          {filterWarnings(warnings, filter).map((w) => (
+          {filteredWarnings.length === 0 && (
+            <Tag color="success">暂无预警</Tag>
+          )}
+          {filteredWarnings.map((w) => (
             <Card
               key={w.id}
               size="small"

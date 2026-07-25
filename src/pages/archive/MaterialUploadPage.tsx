@@ -34,6 +34,7 @@ export function MaterialUploadPage() {
       uploader: values.uploader || '当前用户',
       uploadedAt: new Date().toISOString().split('T')[0],
       remarks: values.remarks || '',
+      versions: [],
     });
     message.success('材料上传成功');
     form.resetFields();

@@ -88,13 +88,22 @@ export interface IndicatorConfig {
 }
 
 // 佐证材料
+export type MaterialStatus = '未提交' | '待审核' | '审核通过' | '退回修改';
+
+export const MATERIAL_STATUS: MaterialStatus[] = ['未提交', '待审核', '审核通过', '退回修改'];
+
 export interface AchievementMaterial {
   id: string;
   achievementId: string;
+  materialType: string;
   name: string;
-  status: '未提交' | '已提交' | '审核中' | '审核通过' | '被退回';
-  submittedAt?: string;
+  fileName: string;
+  fileUrl: string;
+  version: number;
+  status: MaterialStatus;
+  uploadedAt?: string;
   reviewedAt?: string;
+  reviewOpinion?: string;
 }
 
 // 成果（统一结构，按类型使用对应可选字段）
@@ -105,9 +114,17 @@ export interface Achievement {
   unitName: string;
   achievementType: AchievementType;
 
+  // 指标关联
+  indicatorId: string;
+  nodeId: string;
+
   // 通用字段
   title: string;
   responsiblePerson: string;
+  otherContributors?: string[];
+  progressStatus: string;
+  plannedCompletionDate?: string;
+  recognizedCompletionDate?: string;
   status: AchievementStatus;
   createdAt: string;
   updatedAt: string;
@@ -187,7 +204,22 @@ export interface Achievement {
 export type WarningLevel = 'yellow' | 'orange' | 'red';
 
 // 预警类型
-export type WarningType = 'time' | 'quantity_gap' | 'chinese_journal_ratio';
+export type WarningType =
+  | 'time'
+  | 'quantity_gap'
+  | 'progress'
+  | 'material'
+  | 'chinese_journal_ratio'
+  | 'indicator_unassigned';
+
+export const WARNING_TYPES: { value: WarningType; label: string }[] = [
+  { value: 'time', label: '时间预警' },
+  { value: 'quantity_gap', label: '数量缺口预警' },
+  { value: 'progress', label: '成果进度预警' },
+  { value: 'material', label: '佐证材料预警' },
+  { value: 'chinese_journal_ratio', label: '我国科技期刊比例预警' },
+  { value: 'indicator_unassigned', label: '指标未分解预警' },
+];
 
 export interface WarningLevelConfig {
   level: WarningLevel;
@@ -223,11 +255,14 @@ export interface WarningResult {
 export interface ChineseJournalConfig {
   id: string;
   projectId: string;
+  enabled: boolean;
+  scope: string;
   minChineseJournalCount: number;
   minChineseJournalRatio: number;
   decomposeToTopics: boolean;
   topicMinCounts: Record<string, number>;
   effectiveDate: string;
+  remarks: string;
 }
 
 // 版本记录
@@ -267,6 +302,31 @@ export interface ArchiveMaterial {
   uploader: string;
   uploadedAt: string;
   remarks: string;
+  versions: ArchiveMaterialVersion[];
+}
+
+// 归档材料版本
+export interface ArchiveMaterialVersion {
+  id: string;
+  archiveMaterialId: string;
+  version: number;
+  fileName: string;
+  fileUrl: string;
+  uploadedAt: string;
+  uploader: string;
+  versionDescription?: string;
+}
+
+// 归档必交材料清单
+export interface ArchiveRequirement {
+  id: string;
+  projectId: string;
+  categoryId: string;
+  name: string;
+  required: boolean;
+  requiredQuantity: number;
+  applicableNodeId?: string;
+  description?: string;
 }
 
 // 完成统计
@@ -289,7 +349,18 @@ export interface CompletionStats {
 export interface ArchiveMonitoringStats {
   categoryId: string;
   categoryName: string;
-  totalCount: number;
+  requiredCount: number;
   uploadedCount: number;
   missingCount: number;
+  completionRate: number;
+}
+
+// 审批校验结果
+export interface ApprovalValidation {
+  passed: boolean;
+  checks: {
+    label: string;
+    passed: boolean;
+    detail?: string;
+  }[];
 }
