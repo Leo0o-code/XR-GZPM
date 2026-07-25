@@ -21,11 +21,13 @@ import {
 } from '@ant-design/icons';
 import { useAppStore } from '../../store';
 import {
+  ACHIEVEMENT_EVIDENCE_RULES,
   ACHIEVEMENT_STATUS,
   ACHIEVEMENT_TYPES,
   type Achievement,
 } from '../../types';
 import { validateAchievementForApproval } from '../../utils/validation';
+import { mockFileService } from '../../utils/helpers';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -34,6 +36,7 @@ const { Text } = Typography;
 export function AchievementApprovalPage() {
   const {
     topics,
+    units,
     nodes,
     indicators,
     achievements,
@@ -55,14 +58,10 @@ export function AchievementApprovalPage() {
   const topicMap = Object.fromEntries(topics.map((t) => [t.id, t]));
   const indicatorMap = Object.fromEntries(indicators.map((i) => [i.id, i]));
   const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]));
+  const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
 
   const filtered = achievements.filter((a) => {
-    const reviewable = [
-      '已提交',
-      '审批中',
-      '审批不通过',
-      '退回修改',
-    ].includes(a.status);
+    const reviewable = ['已提交', '审批中', '审批不通过', '退回修改'].includes(a.status);
     return (
       reviewable &&
       (!filter.topicId || a.topicId === filter.topicId) &&
@@ -74,10 +73,9 @@ export function AchievementApprovalPage() {
   const openApproval = (achievement: Achievement) => {
     setEditing(achievement);
 
-    // Run approval validation
     const indicator = indicatorMap[achievement.indicatorId];
     const node = nodeMap[achievement.nodeId];
-    const val = validateAchievementForApproval(achievement, indicator, node);
+    const val = validateAchievementForApproval(achievement, indicator, node, achievements);
     setValidation(val);
 
     form.setFieldsValue({
@@ -106,17 +104,9 @@ export function AchievementApprovalPage() {
       }
       approveAchievement(editing.id, payload, '当前审批人');
     } else if (values.result === 'reject') {
-      rejectAchievement(
-        editing.id,
-        values.approvalOpinion || '审批不通过',
-        '当前审批人'
-      );
+      rejectAchievement(editing.id, values.approvalOpinion || '审批不通过', '当前审批人');
     } else if (values.result === 'return') {
-      returnAchievement(
-        editing.id,
-        values.approvalOpinion || '退回修改',
-        '当前审批人'
-      );
+      returnAchievement(editing.id, values.approvalOpinion || '退回修改', '当前审批人');
     }
 
     setVisible(false);
@@ -152,14 +142,11 @@ export function AchievementApprovalPage() {
     },
     {
       title: '责任单位',
-      dataIndex: 'unitName',
-      key: 'unitName',
+      dataIndex: 'unitId',
+      key: 'unitId',
+      render: (v: string) => unitMap[v] || v,
     },
-    {
-      title: '责任人',
-      dataIndex: 'responsiblePerson',
-      key: 'responsiblePerson',
-    },
+    { title: '责任人', dataIndex: 'responsiblePerson', key: 'responsiblePerson' },
     {
       title: '进度',
       dataIndex: 'progressStatus',
@@ -176,12 +163,7 @@ export function AchievementApprovalPage() {
       title: '操作',
       key: 'action',
       render: (_: any, record: Achievement) => (
-        <Button
-          type="primary"
-          icon={<CheckOutlined />}
-          size="small"
-          onClick={() => openApproval(record)}
-        >
+        <Button type="primary" icon={<CheckOutlined />} size="small" onClick={() => openApproval(record)}>
           审批
         </Button>
       ),
@@ -198,9 +180,7 @@ export function AchievementApprovalPage() {
           onChange={(v) => setFilter({ ...filter, topicId: v })}
         >
           {topics.map((t) => (
-            <Option key={t.id} value={t.id}>
-              {t.name}
-            </Option>
+            <Option key={t.id} value={t.id}>{t.name}</Option>
           ))}
         </Select>
         <Select
@@ -210,9 +190,7 @@ export function AchievementApprovalPage() {
           onChange={(v) => setFilter({ ...filter, achievementType: v })}
         >
           {ACHIEVEMENT_TYPES.map((t) => (
-            <Option key={t} value={t}>
-              {t}
-            </Option>
+            <Option key={t} value={t}>{t}</Option>
           ))}
         </Select>
         <Select
@@ -222,19 +200,12 @@ export function AchievementApprovalPage() {
           onChange={(v) => setFilter({ ...filter, status: v })}
         >
           {ACHIEVEMENT_STATUS.filter((s) => s !== '草稿').map((s) => (
-            <Option key={s} value={s}>
-              {s}
-            </Option>
+            <Option key={s} value={s}>{s}</Option>
           ))}
         </Select>
       </Space>
 
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={filtered}
-        pagination={{ pageSize: 10 }}
-      />
+      <Table rowKey="id" columns={columns} dataSource={filtered} pagination={{ pageSize: 10 }} />
 
       <Modal
         title={`审批：${editing?.title}`}
@@ -252,35 +223,19 @@ export function AchievementApprovalPage() {
           <>
             <div style={{ marginBottom: 16 }}>
               <Descriptions column={2} size="small" bordered>
-                <Descriptions.Item label="成果类型">
-                  {editing.achievementType}
-                </Descriptions.Item>
-                <Descriptions.Item label="责任单位">
-                  {editing.unitName}
-                </Descriptions.Item>
-                <Descriptions.Item label="责任人">
-                  {editing.responsiblePerson}
-                </Descriptions.Item>
-                <Descriptions.Item label="当前状态">
-                  {editing.status}
-                </Descriptions.Item>
-                <Descriptions.Item label="当前进度">
-                  {editing.progressStatus || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="指标认定条件">
-                  {indicatorMap[editing.indicatorId]?.recognitionStatus || '-'}
+                <Descriptions.Item label="成果类型">{editing.achievementType}</Descriptions.Item>
+                <Descriptions.Item label="责任单位">{unitMap[editing.unitId] || editing.unitId}</Descriptions.Item>
+                <Descriptions.Item label="责任人">{editing.responsiblePerson}</Descriptions.Item>
+                <Descriptions.Item label="当前状态">{editing.status}</Descriptions.Item>
+                <Descriptions.Item label="当前进度">{editing.progressStatus || '-'}</Descriptions.Item>
+                <Descriptions.Item label="佐证材料规则">
+                  {ACHIEVEMENT_EVIDENCE_RULES[editing.achievementType]?.displayText || '-'}
                 </Descriptions.Item>
                 {editing.achievementType === '学术论文' && (
                   <>
-                    <Descriptions.Item label="期刊名称">
-                      {editing.journalName || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="是否代表性论文">
-                      {editing.isRepresentative ? '是' : '否'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="是否我国科技期刊">
-                      {editing.isChineseJournal ? '是' : '否'}
-                    </Descriptions.Item>
+                    <Descriptions.Item label="期刊名称">{editing.journalName || '-'}</Descriptions.Item>
+                    <Descriptions.Item label="是否代表性论文">{editing.isRepresentative ? '是' : '否'}</Descriptions.Item>
+                    <Descriptions.Item label="是否国内期刊">{editing.isChineseJournal ? '是' : '否'}</Descriptions.Item>
                   </>
                 )}
               </Descriptions>
@@ -301,33 +256,19 @@ export function AchievementApprovalPage() {
                 style={{ marginBottom: 16 }}
               >
                 {validation.checks.map(
-                  (
-                    check: { label: string; passed: boolean; detail?: string },
-                    idx: number
-                  ) => (
+                  (check: { label: string; passed: boolean; detail?: string }, idx: number) => (
                     <div
                       key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        marginBottom: 4,
-                      }}
+                      style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}
                     >
                       {check.passed ? (
-                        <CheckCircleFilled
-                          style={{ color: '#52c41a', marginRight: 8 }}
-                        />
+                        <CheckCircleFilled style={{ color: '#52c41a', marginRight: 8 }} />
                       ) : (
-                        <CloseCircleFilled
-                          style={{ color: '#f5222d', marginRight: 8 }}
-                        />
+                        <CloseCircleFilled style={{ color: '#f5222d', marginRight: 8 }} />
                       )}
                       <Text style={{ flex: 1 }}>{check.label}</Text>
                       {check.detail && (
-                        <Text
-                          type={check.passed ? 'secondary' : 'danger'}
-                          style={{ fontSize: 12 }}
-                        >
+                        <Text type={check.passed ? 'secondary' : 'danger'} style={{ fontSize: 12 }}>
                           {check.detail}
                         </Text>
                       )}
@@ -339,31 +280,38 @@ export function AchievementApprovalPage() {
 
             {/* Materials display */}
             {editing.materials && editing.materials.length > 0 && (
-              <Card
-                size="small"
-                title="佐证材料"
-                style={{ marginBottom: 16 }}
-              >
+              <Card size="small" title="佐证材料" style={{ marginBottom: 16 }}>
                 <Space direction="vertical" style={{ width: '100%' }}>
                   {editing.materials.map((m) => (
                     <div
                       key={m.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                      }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                     >
                       <Text>{m.materialType || m.name}</Text>
                       <Space>
                         {m.fileName && (
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {m.fileName}
-                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>{m.fileName}</Text>
                         )}
-                        <Tag color={materialStatusColor[m.status] || 'default'}>
-                          {m.status}
-                        </Tag>
+                        {m.fileId && (
+                          <Button
+                            size="small"
+                            type="link"
+                            onClick={() => mockFileService.preview(m.fileId)}
+                          >
+                            预览
+                          </Button>
+                        )}
+                        {m.fileUrl && (
+                          <Button
+                            size="small"
+                            type="link"
+                            href={m.fileUrl}
+                            target="_blank"
+                          >
+                            下载
+                          </Button>
+                        )}
+                        <Tag color={materialStatusColor[m.status] || 'default'}>{m.status}</Tag>
                       </Space>
                     </div>
                   ))}
@@ -374,12 +322,7 @@ export function AchievementApprovalPage() {
         )}
 
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            label="审批结论"
-            name="result"
-            initialValue="pass"
-            rules={[{ required: true }]}
-          >
+          <Form.Item label="审批结论" name="result" initialValue="pass" rules={[{ required: true }]}>
             <Radio.Group>
               <Radio value="pass">审批通过</Radio>
               <Radio value="reject">审批不通过</Radio>
@@ -391,32 +334,20 @@ export function AchievementApprovalPage() {
             label="是否计入指标"
             name="countsToIndicator"
             valuePropName="checked"
-            extra={
-              !validation?.passed
-                ? '系统校验未全部通过，不建议计入指标'
-                : undefined
-            }
+            extra={!validation?.passed ? '系统校验未全部通过，不建议计入指标' : undefined}
           >
             <Switch disabled={!validation?.passed} />
           </Form.Item>
 
           {editing?.achievementType === '学术论文' && (
             <>
-              <Form.Item
-                label="是否代表性论文"
-                name="isRepresentative"
-                valuePropName="checked"
-              >
+              <Form.Item label="是否代表性论文" name="isRepresentative" valuePropName="checked">
                 <Switch />
               </Form.Item>
-              <Form.Item
-                label="是否我国科技期刊"
-                name="isChineseJournal"
-                valuePropName="checked"
-              >
+              <Form.Item label="是否国内期刊" name="isChineseJournal" valuePropName="checked">
                 <Switch />
               </Form.Item>
-              <Form.Item label="我国科技期刊判定说明" name="chineseJournalReason">
+              <Form.Item label="国内期刊判定说明" name="chineseJournalReason">
                 <TextArea rows={2} />
               </Form.Item>
             </>

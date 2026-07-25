@@ -2,8 +2,8 @@ import dayjs from 'dayjs';
 import type {
   Achievement,
   AchievementType,
-  ChineseJournalConfig,
   CompletionStats,
+  DomesticJournalConfig,
   IndicatorConfig,
   TimeNode,
   Topic,
@@ -14,7 +14,8 @@ import { daysUntil } from './helpers';
 export const isRecognized = (a: Achievement, deadline?: string) => {
   const approved = a.status === '审批通过' && a.countsToIndicator;
   if (!approved) return false;
-  if (a.recognizedCompletionDate && deadline) {
+  if (deadline) {
+    if (!a.recognizedCompletionDate) return false;
     return dayjs(a.recognizedCompletionDate).isBefore(dayjs(deadline)) || dayjs(a.recognizedCompletionDate).isSame(dayjs(deadline));
   }
   return true;
@@ -32,12 +33,13 @@ export const calculateCompletionStats = (
   const node = nodes.find((n) => n.id === indicator.nodeId);
   const deadline = node?.deadline;
 
+  // Filter by topicId + unitId + achievementType (NOT indicatorId)
+  // This allows mid-term achievements to count toward final cumulative nodes
   const relevant = achievements.filter(
     (a) =>
       a.topicId === indicator.topicId &&
-      a.unitName === indicator.unitName &&
-      a.achievementType === indicator.achievementType &&
-      a.indicatorId === indicator.id
+      a.unitId === indicator.unitId &&
+      a.achievementType === indicator.achievementType
   );
 
   const registeredCount = relevant.filter((a) => isRegistered(a)).length;
@@ -46,9 +48,9 @@ export const calculateCompletionStats = (
   const completionRate = indicator.plannedQuantity > 0 ? recognizedCount / indicator.plannedQuantity : 0;
 
   return {
-    viewKey: `${indicator.topicId}-${indicator.unitName}-${indicator.achievementType}-${indicator.nodeId}`,
+    viewKey: `${indicator.topicId}-${indicator.unitId}-${indicator.achievementType}-${indicator.nodeId}`,
     topicId: indicator.topicId,
-    unitName: indicator.unitName,
+    unitId: indicator.unitId,
     achievementType: indicator.achievementType,
     nodeId: indicator.nodeId,
     nodeName: node?.name || indicator.nodeId,
@@ -61,7 +63,7 @@ export const calculateCompletionStats = (
   };
 };
 
-export interface ChineseJournalRatioResult {
+export interface DomesticJournalRatioResult {
   total: number;
   chinese: number;
   ratio: number | null;
@@ -74,11 +76,11 @@ export interface ChineseJournalRatioResult {
   ratioGap: number | null;
 }
 
-export const calculateChineseJournalRatio = (
+export const calculateDomesticJournalRatio = (
   achievements: Achievement[],
-  config: ChineseJournalConfig
-): ChineseJournalRatioResult => {
-  // 只统计审批通过 + 计入指标 + 代表性论文
+  config: DomesticJournalConfig
+): DomesticJournalRatioResult => {
+  // Only count representative papers with status === '审批通过' && countsToIndicator
   const representative = achievements.filter(
     (a) =>
       a.achievementType === '学术论文' &&
@@ -101,9 +103,16 @@ export const calculateChineseJournalRatio = (
   const projectedChinese = projectedRepresentative.filter((a) => a.isChineseJournal).length;
   const projectedRatio = projectedTotal > 0 ? (projectedChinese / projectedTotal) * 100 : null;
 
-  const minRequiredCount = config.minChineseJournalCount;
-  const gapCount = ratio !== null ? Math.max(0, minRequiredCount - chinese) : Math.max(0, minRequiredCount);
-  const ratioGap = ratio !== null ? Math.max(0, config.minChineseJournalRatio - ratio) : null;
+  const minRequiredCount = config.minCount ?? 0;
+  const minRequiredRatio = config.minRatio;
+
+  // For gap: ratioRequiredCount = Math.ceil(total * minRatio / 100); gapCount = Math.max(countGap, ratioGap)
+  const ratioRequiredCount = Math.ceil(total * minRequiredRatio / 100);
+  const countGap = Math.max(0, minRequiredCount - chinese);
+  const ratioGapCount = Math.max(0, ratioRequiredCount - chinese);
+  const gapCount = Math.max(countGap, ratioGapCount);
+
+  const ratioGap = ratio !== null ? Math.max(0, minRequiredRatio - ratio) : null;
 
   return {
     total, chinese,
@@ -111,7 +120,7 @@ export const calculateChineseJournalRatio = (
     projectedTotal, projectedChinese,
     projectedRatio: projectedRatio !== null ? Number(projectedRatio.toFixed(2)) : null,
     minRequiredCount,
-    minRequiredRatio: config.minChineseJournalRatio,
+    minRequiredRatio,
     gapCount,
     ratioGap: ratioGap !== null ? Number(ratioGap.toFixed(2)) : null,
   };
@@ -137,7 +146,6 @@ export const aggregateStats = (
   topics: Topic[]
 ) => {
   const stats = indicators
-    .filter((i) => i.enabled && (i.status === '已发布' || i.status === '已调整'))
     .map((i) => calculateCompletionStats(i, achievements, nodes));
 
   const grouped = new Map<string, CompletionStats>();
@@ -149,12 +157,25 @@ export const aggregateStats = (
     switch (groupBy) {
       case 'project': key = `${s.achievementType}-${s.nodeId}`; viewKey = 'project'; break;
       case 'topic': key = `${s.topicId}-${s.achievementType}-${s.nodeId}`; viewKey = `${topic?.name || s.topicId}`; break;
-      case 'unit': key = `${s.topicId}-${s.unitName}-${s.achievementType}-${s.nodeId}`; viewKey = `${topic?.name || s.topicId} - ${s.unitName}`; break;
+      case 'unit': key = `${s.topicId || 'project'}-${s.unitId || 'all'}-${s.achievementType}-${s.nodeId}`; viewKey = `${topic?.name || s.topicId} - ${s.unitId}`; break;
       case 'node': key = `${s.nodeId}-${s.achievementType}`; viewKey = s.nodeName; break;
     }
 
     if (!grouped.has(key)) {
-      grouped.set(key, { viewKey, topicId: groupBy === 'topic' || groupBy === 'unit' ? s.topicId : undefined, unitName: groupBy === 'unit' ? s.unitName : undefined, achievementType: s.achievementType, nodeId: s.nodeId, nodeName: s.nodeName, deadline: s.deadline, plannedQuantity: 0, registeredCount: 0, recognizedCount: 0, missingCount: 0, completionRate: 0 });
+      grouped.set(key, {
+        viewKey,
+        topicId: groupBy === 'topic' || groupBy === 'unit' ? s.topicId : undefined,
+        unitId: groupBy === 'unit' ? s.unitId : undefined,
+        achievementType: s.achievementType,
+        nodeId: s.nodeId,
+        nodeName: s.nodeName,
+        deadline: s.deadline,
+        plannedQuantity: 0,
+        registeredCount: 0,
+        recognizedCount: 0,
+        missingCount: 0,
+        completionRate: 0,
+      });
     }
 
     const existing = grouped.get(key)!;
@@ -173,14 +194,13 @@ export const findNearestNode = (
   indicators: IndicatorConfig[],
   nodes: TimeNode[],
   topicId?: string,
-  unitName?: string,
+  unitId?: string,
   achievementType?: AchievementType
 ): { nodeId: string; nodeName: string; deadline: string; daysRemaining: number } | null => {
   const relevant = indicators.filter(
     (i) =>
-      i.enabled && (i.status === '已发布' || i.status === '已调整') &&
       (!topicId || i.topicId === topicId) &&
-      (!unitName || i.unitName === unitName) &&
+      (!unitId || i.unitId === unitId) &&
       (!achievementType || i.achievementType === achievementType)
   );
   if (relevant.length === 0) return null;

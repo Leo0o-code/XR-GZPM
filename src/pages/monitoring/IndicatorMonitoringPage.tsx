@@ -13,7 +13,7 @@ import {
 import { DownloadOutlined } from '@ant-design/icons';
 import { useAppStore } from '../../store';
 import { ACHIEVEMENT_TYPES, WARNING_TYPES, type AchievementType, type CompletionStats } from '../../types';
-import { aggregateStats, calculateChineseJournalRatio } from '../../utils/stats';
+import { aggregateStats, calculateDomesticJournalRatio } from '../../utils/stats';
 import { generateWarnings, filterWarnings } from '../../utils/warnings';
 import { exportToExcel } from '../../utils/export';
 import { daysUntil, levelColor, levelLabel } from '../../utils/helpers';
@@ -26,10 +26,11 @@ type ViewType = 'project' | 'topic' | 'unit' | 'node';
 export function IndicatorMonitoringPage() {
   const {
     topics,
+    units,
     nodes,
     indicators,
     achievements,
-    chineseJournalConfig,
+    domesticJournalConfig,
     warningRules,
   } = useAppStore();
 
@@ -42,6 +43,7 @@ export function IndicatorMonitoringPage() {
   });
 
   const topicMap = Object.fromEntries(topics.map((t) => [t.id, t]));
+  const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
 
   const stats = useMemo(() => {
     const all = aggregateStats(indicators, achievements, nodes, view, topics);
@@ -53,21 +55,12 @@ export function IndicatorMonitoringPage() {
     });
   }, [indicators, achievements, nodes, view, topics, filter]);
 
-  // Pass the full warningRules (all 6 types) to generateWarnings
   const warnings = useMemo(
-    () =>
-      generateWarnings(
-        indicators,
-        achievements,
-        nodes,
-        chineseJournalConfig,
-        warningRules,
-        topics
-      ),
-    [indicators, achievements, nodes, chineseJournalConfig, warningRules, topics]
+    () => generateWarnings(indicators, achievements, nodes, domesticJournalConfig, warningRules, topics, unitMap),
+    [indicators, achievements, nodes, domesticJournalConfig, warningRules, topics, unitMap]
   );
 
-  const ratioData = calculateChineseJournalRatio(achievements, chineseJournalConfig);
+  const ratioData = calculateDomesticJournalRatio(achievements, domesticJournalConfig);
 
   const filteredWarnings = useMemo(
     () =>
@@ -84,7 +77,7 @@ export function IndicatorMonitoringPage() {
     const rows = stats.map((s) => ({
       视角: s.viewKey,
       课题: s.topicId ? topicMap[s.topicId]?.name : '-',
-      责任单位: s.unitName || '-',
+      责任单位: s.unitId ? unitMap[s.unitId] || s.unitId : '-',
       成果类型: s.achievementType,
       时间节点: s.nodeName,
       截止时间: s.deadline,
@@ -95,10 +88,7 @@ export function IndicatorMonitoringPage() {
       完成率: `${(s.completionRate * 100).toFixed(1)}%`,
       剩余天数: daysUntil(s.deadline),
     }));
-    exportToExcel(
-      rows,
-      `指标监控_${view}_${new Date().toISOString().split('T')[0]}`
-    );
+    exportToExcel(rows, `指标监控_${view}_${new Date().toISOString().split('T')[0]}`);
   };
 
   const columns = [
@@ -107,10 +97,8 @@ export function IndicatorMonitoringPage() {
       dataIndex: 'viewKey',
       key: 'viewKey',
       render: (v: string, record: CompletionStats) => {
-        if (view === 'topic')
-          return topicMap[record.topicId!]?.name || record.topicId;
-        if (view === 'unit')
-          return `${topicMap[record.topicId!]?.name || record.topicId} - ${record.unitName}`;
+        if (view === 'topic') return topicMap[record.topicId!]?.name || record.topicId;
+        if (view === 'unit') return `${topicMap[record.topicId!]?.name || record.topicId} - ${unitMap[record.unitId!] || record.unitId}`;
         return v;
       },
     },
@@ -135,13 +123,15 @@ export function IndicatorMonitoringPage() {
       render: (_: any, record: CompletionStats) => {
         const days = daysUntil(record.deadline);
         return (
-          <Tag color={days < 0 ? 'red' : days <= 30 ? 'orange' : 'green'}>
-            {days}
-          </Tag>
+          <Tag color={days < 0 ? 'red' : days <= 30 ? 'orange' : 'green'}>{days}</Tag>
         );
       },
     },
   ];
+
+  // Use unique rowKey
+  const getRowKey = (record: CompletionStats) =>
+    `${record.topicId || 'project'}-${record.unitId || 'all'}-${record.achievementType}-${record.nodeId}`;
 
   return (
     <div>
@@ -161,9 +151,7 @@ export function IndicatorMonitoringPage() {
             onChange={(v) => setFilter({ ...filter, topicId: v })}
           >
             {topics.map((t) => (
-              <Option key={t.id} value={t.id}>
-                {t.name}
-              </Option>
+              <Option key={t.id} value={t.id}>{t.name}</Option>
             ))}
           </Select>
 
@@ -171,28 +159,20 @@ export function IndicatorMonitoringPage() {
             placeholder="成果类型"
             allowClear
             style={{ width: 140 }}
-            onChange={(v) =>
-              setFilter({ ...filter, achievementType: v || undefined })
-            }
+            onChange={(v) => setFilter({ ...filter, achievementType: v || undefined })}
           >
             {ACHIEVEMENT_TYPES.map((t) => (
-              <Option key={t} value={t}>
-                {t}
-              </Option>
+              <Option key={t} value={t}>{t}</Option>
             ))}
           </Select>
 
-          <Button
-            type="primary"
-            icon={<DownloadOutlined />}
-            onClick={handleExport}
-          >
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
             导出 Excel
           </Button>
         </Space>
 
         <Table
-          rowKey={(record) => record.viewKey}
+          rowKey={getRowKey}
           columns={columns}
           dataSource={stats}
           pagination={{ pageSize: 10 }}
@@ -200,29 +180,24 @@ export function IndicatorMonitoringPage() {
         />
       </Card>
 
-      <Card title="我国科技期刊论文监控" style={{ marginBottom: 16 }}>
+      <Card title="国内期刊论文监控" style={{ marginBottom: 16 }}>
         <Space size="large">
           <div>
             <Title level={5}>当前比例</Title>
             <Tag
               color={
-                ratioData.ratio !== null &&
-                ratioData.ratio >= ratioData.minRequiredRatio
+                ratioData.ratio !== null && ratioData.ratio >= ratioData.minRequiredRatio
                   ? 'success'
                   : 'warning'
               }
             >
-              {ratioData.ratio !== null
-                ? `${ratioData.ratio}%`
-                : '暂无数据'}
+              {ratioData.ratio !== null ? `${ratioData.ratio}%` : '暂无数据'}
             </Tag>
           </div>
           <div>
             <Title level={5}>预计比例</Title>
             <Tag>
-              {ratioData.projectedRatio !== null
-                ? `${ratioData.projectedRatio}%`
-                : '暂无数据'}
+              {ratioData.projectedRatio !== null ? `${ratioData.projectedRatio}%` : '暂无数据'}
             </Tag>
           </div>
           <div>
@@ -233,9 +208,7 @@ export function IndicatorMonitoringPage() {
           </div>
           <div>
             <Title level={5}>尚缺</Title>
-            <Tag
-              color={ratioData.gapCount > 0 ? 'error' : 'success'}
-            >
+            <Tag color={ratioData.gapCount > 0 ? 'error' : 'success'}>
               {ratioData.gapCount} 篇
             </Tag>
           </div>
@@ -262,17 +235,13 @@ export function IndicatorMonitoringPage() {
             onChange={(v) => setFilter({ ...filter, type: v })}
           >
             {WARNING_TYPES.map((wt) => (
-              <Option key={wt.value} value={wt.value}>
-                {wt.label}
-              </Option>
+              <Option key={wt.value} value={wt.value}>{wt.label}</Option>
             ))}
           </Select>
         </Space>
 
         <Space direction="vertical" style={{ width: '100%' }}>
-          {filteredWarnings.length === 0 && (
-            <Tag color="success">暂无预警</Tag>
-          )}
+          {filteredWarnings.length === 0 && <Tag color="success">暂无预警</Tag>}
           {filteredWarnings.map((w) => (
             <Card
               key={w.id}

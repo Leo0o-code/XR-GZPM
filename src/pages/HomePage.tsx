@@ -1,17 +1,18 @@
 import { Card, Col, Row, Statistic, Typography } from 'antd';
 import { useAppStore } from '../store';
 import { generateWarnings } from '../utils/warnings';
-import { calculateChineseJournalRatio } from '../utils/stats';
+import { calculateDomesticJournalRatio } from '../utils/stats';
 
 const { Title, Paragraph } = Typography;
 
 export function HomePage() {
-  const { project, topics, nodes, indicators, achievements, chineseJournalConfig, warningRules } = useAppStore();
+  const { project, topics, units, nodes, indicators, achievements, domesticJournalConfig, warningRules } = useAppStore();
 
-  const warnings = generateWarnings(indicators, achievements, nodes, chineseJournalConfig, warningRules, topics);
-  const ratioData = calculateChineseJournalRatio(achievements, chineseJournalConfig);
+  const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
+  const warnings = generateWarnings(indicators, achievements, nodes, domesticJournalConfig, warningRules, topics, unitMap);
+  const ratioData = calculateDomesticJournalRatio(achievements, domesticJournalConfig);
 
-  const totalIndicators = indicators.filter((i) => i.enabled).length;
+  const totalIndicators = indicators.length;
   const totalAchievements = achievements.length;
   const approvedAchievements = achievements.filter((a) => a.status === '审批通过').length;
 
@@ -57,7 +58,7 @@ export function HomePage() {
           </Card>
         </Col>
         <Col span={12}>
-          <Card title="我国科技期刊论文比例">
+          <Card title="国内期刊论文比例">
             <Statistic
               value={ratioData.ratio !== null ? `${ratioData.ratio}%` : '暂无数据'}
               suffix={ratioData.ratio !== null ? `/ 目标 ${ratioData.minRequiredRatio}%` : ''}

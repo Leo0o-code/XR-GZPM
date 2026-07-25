@@ -9,17 +9,29 @@ import { TalentFields } from './TalentFields';
 const { Option } = Select;
 const { TextArea } = Input;
 
+interface TopicInfo {
+  id: string; name: string; leadingUnitId: string; participatingUnitIds: string[];
+}
+
+interface UnitInfo {
+  id: string; name: string;
+}
+
 interface AchievementFormProps {
   form: any;
-  topics: Array<{ id: string; name: string; leadingUnit: string; participatingUnits: string[] }>;
+  topics: TopicInfo[];
+  units: UnitInfo[];
   achievement?: Achievement;
 }
 
-export function AchievementForm({ form, topics }: AchievementFormProps) {
+export function AchievementForm({ form, topics, units }: AchievementFormProps) {
   const achievementType = Form.useWatch('achievementType', form);
   const topicId = Form.useWatch('topicId', form);
   const topic = topics.find((t) => t.id === topicId);
-  const unitOptions = topic ? [topic.leadingUnit, ...topic.participatingUnits] : [];
+  const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
+  const unitOptions = topic
+    ? [topic.leadingUnitId, ...topic.participatingUnitIds]
+    : [];
 
   return (
     <div>
@@ -29,7 +41,7 @@ export function AchievementForm({ form, topics }: AchievementFormProps) {
             <Form.Item label="所属课题" name="topicId" rules={[{ required: true, message: '请选择课题' }]}>
               <Select
                 placeholder="选择课题"
-                onChange={() => form.setFieldsValue({ unitName: undefined })}
+                onChange={() => form.setFieldsValue({ unitId: undefined })}
               >
                 {topics.map((t) => (
                   <Option key={t.id} value={t.id}>{t.name}</Option>
@@ -38,10 +50,10 @@ export function AchievementForm({ form, topics }: AchievementFormProps) {
             </Form.Item>
           </Col>
           <Col span={12}>
-            <Form.Item label="责任单位" name="unitName" rules={[{ required: true, message: '请选择责任单位' }]}>
+            <Form.Item label="责任单位" name="unitId" rules={[{ required: true, message: '请选择责任单位' }]}>
               <Select placeholder="选择责任单位" disabled={!topicId}>
-                {unitOptions.map((u) => (
-                  <Option key={u} value={u}>{u}</Option>
+                {unitOptions.map((uid) => (
+                  <Option key={uid} value={uid}>{unitMap[uid] || uid}</Option>
                 ))}
               </Select>
             </Form.Item>

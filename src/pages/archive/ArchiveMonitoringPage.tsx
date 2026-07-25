@@ -1,5 +1,8 @@
-import { Card, Progress, Table, Tag } from 'antd';
+import { useState } from 'react';
+import { Card, Progress, Select, Space, Table, Tag } from 'antd';
 import { useAppStore } from '../../store';
+
+const { Option } = Select;
 
 export function ArchiveMonitoringPage() {
   const {
@@ -7,38 +10,50 @@ export function ArchiveMonitoringPage() {
     archiveMaterials,
     archiveRequirements,
     achievements,
+    units,
+    nodes,
   } = useAppStore();
 
-  // Calculate stats per category using archiveRequirements
+  const [filterNodeId, setFilterNodeId] = useState<string>('');
+
+  const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
+
+  // Filter requirements by node if a node filter is selected
+  const filteredRequirements = filterNodeId
+    ? archiveRequirements.filter((r) => !r.applicableNodeId || r.applicableNodeId === filterNodeId)
+    : archiveRequirements;
+
+  // Calculate stats per category
   const stats = archiveCategories.map((category) => {
-    const reqs = archiveRequirements.filter(
-      (r) => r.categoryId === category.id && r.required
-    );
-    // Total required items = sum of required quantities
-    const requiredCount = reqs.reduce(
-      (sum, r) => sum + r.requiredQuantity,
-      0
-    );
-    // Uploaded = number of materials in this category
-    const uploadedMaterials = archiveMaterials.filter(
-      (m) => m.categoryId === category.id
-    );
-    const uploadedCount = uploadedMaterials.length;
-    const missingCount = Math.max(0, requiredCount - uploadedCount);
-    const completionRate =
-      requiredCount > 0
-        ? Math.min(100, (uploadedCount / requiredCount) * 100)
-        : uploadedCount > 0
-        ? 100
-        : 0;
+    const reqs = filteredRequirements.filter((r) => r.categoryId === category.id && r.required);
+    const requiredCount = reqs.reduce((sum, r) => sum + r.requiredQuantity, 0);
+
+    // Count satisfied requirements (not just file count!)
+    // A requirement is satisfied if there are enough materials linked to it
+    let satisfiedCount = 0;
+    reqs.forEach((req) => {
+      const materialsForReq = archiveMaterials.filter(
+        (m) => m.categoryId === category.id && (!req.id || m.requirementId === req.id)
+      );
+      if (materialsForReq.length >= req.requiredQuantity) {
+        satisfiedCount++;
+      }
+    });
+    const totalRequiredRequirements = reqs.length;
+    const completionRate = totalRequiredRequirements > 0
+      ? (satisfiedCount / totalRequiredRequirements) * 100
+      : 0;
+    const missingCount = Math.max(0, totalRequiredRequirements - satisfiedCount);
 
     return {
       categoryId: category.id,
       categoryName: category.name,
       requiredCount,
-      uploadedCount,
+      totalRequiredRequirements,
+      satisfiedRequirements: satisfiedCount,
       missingCount,
       completionRate,
+      uploadedCount: archiveMaterials.filter((m) => m.categoryId === category.id).length,
       reqs,
     };
   });
@@ -56,17 +71,11 @@ export function ArchiveMonitoringPage() {
       key: 'categoryName',
     },
     {
-      title: '必交材料项数',
-      dataIndex: 'requiredCount',
-      key: 'requiredCount',
-      render: (v: number, record: any) => (
+      title: '必交材料要求',
+      key: 'requirements',
+      render: (_: any, record: any) => (
         <span>
-          {v}
-          {record.reqs.length > 0 && (
-            <Tag style={{ marginLeft: 4 }} color="blue">
-              {record.reqs.length} 项要求
-            </Tag>
-          )}
+          {record.totalRequiredRequirements} 项要求 / {record.requiredCount} 份材料
         </span>
       ),
     },
@@ -76,7 +85,13 @@ export function ArchiveMonitoringPage() {
       key: 'uploadedCount',
     },
     {
-      title: '缺失',
+      title: '已满足',
+      dataIndex: 'satisfiedRequirements',
+      key: 'satisfiedRequirements',
+      render: (v: number) => <Tag color="success">{v}</Tag>,
+    },
+    {
+      title: '缺失要求',
       dataIndex: 'missingCount',
       key: 'missingCount',
       render: (v: number) => (
@@ -100,17 +115,31 @@ export function ArchiveMonitoringPage() {
   const achievementColumns = [
     { title: '成果名称', dataIndex: 'title', key: 'title' },
     { title: '成果类型', dataIndex: 'achievementType', key: 'achievementType' },
-    { title: '责任单位', dataIndex: 'unitName', key: 'unitName' },
     {
-      title: '责任人',
-      dataIndex: 'responsiblePerson',
-      key: 'responsiblePerson',
+      title: '责任单位',
+      dataIndex: 'unitId',
+      key: 'unitId',
+      render: (v: string) => unitMap[v] || v,
     },
+    { title: '责任人', dataIndex: 'responsiblePerson', key: 'responsiblePerson' },
   ];
 
   return (
     <div>
       <Card title="归档进度监控" style={{ marginBottom: 16 }}>
+        <Space style={{ marginBottom: 16 }}>
+          <Select
+            placeholder="按节点筛选"
+            allowClear
+            style={{ width: 200 }}
+            value={filterNodeId || undefined}
+            onChange={(v) => setFilterNodeId(v || '')}
+          >
+            {nodes.map((n) => (
+              <Option key={n.id} value={n.id}>{n.name}</Option>
+            ))}
+          </Select>
+        </Space>
         <Table
           rowKey="categoryId"
           columns={statsColumns}

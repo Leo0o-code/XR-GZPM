@@ -7,12 +7,19 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 export function MaterialUploadPage() {
-  const { archiveCategories, achievements, addArchiveMaterial } = useAppStore();
+  const { archiveCategories, archiveRequirements, achievements, addArchiveMaterial } = useAppStore();
   const [form] = Form.useForm();
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
 
   const approvedAchievements = achievements.filter((a) => a.status === '审批通过');
+
+  // Watch categoryId to filter requirements
+  const selectedCategoryId: string | undefined = Form.useWatch('categoryId', form);
+
+  const filteredRequirements = selectedCategoryId
+    ? archiveRequirements.filter((r) => r.categoryId === selectedCategoryId)
+    : [];
 
   const handleFileChange = (info: any) => {
     const file = info.file.originFileObj || info.file;
@@ -27,6 +34,7 @@ export function MaterialUploadPage() {
       id: `am-${Date.now()}`,
       projectId: 'p1',
       categoryId: values.categoryId,
+      requirementId: values.requirementId || undefined,
       name: values.name,
       fileName,
       fileUrl,
@@ -60,12 +68,20 @@ export function MaterialUploadPage() {
           </Select>
         </Form.Item>
 
+        <Form.Item label="对应必交材料要求" name="requirementId">
+          <Select placeholder="选择对应的必交材料（可选）" allowClear disabled={!selectedCategoryId}>
+            {filteredRequirements.map((r) => (
+              <Option key={r.id} value={r.id}>
+                {r.name} {r.required ? `(必交 x${r.requiredQuantity})` : '(可选)'}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
         <Form.Item label="从科研成果同步" name="sourceAchievementId">
           <Select placeholder="选择已审批成果（可选）" allowClear onChange={handleAchievementChange}>
             {approvedAchievements.map((a) => (
-              <Option key={a.id} value={a.id}>
-                {a.title}（{a.achievementType}）
-              </Option>
+              <Option key={a.id} value={a.id}>{a.title}（{a.achievementType}）</Option>
             ))}
           </Select>
         </Form.Item>

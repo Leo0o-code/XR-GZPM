@@ -48,9 +48,7 @@ export function ArchiveCatalogPage() {
   const [reqForm] = Form.useForm();
   const [selectedCategory, setSelectedCategory] = useState<string>('');
 
-  const categoryMap = Object.fromEntries(
-    archiveCategories.map((c) => [c.id, c])
-  );
+  const categoryMap = Object.fromEntries(archiveCategories.map((c) => [c.id, c]));
 
   const filteredReqs = selectedCategory
     ? archiveRequirements.filter((r) => r.categoryId === selectedCategory)
@@ -129,22 +127,13 @@ export function ArchiveCatalogPage() {
   const catalogColumns = [
     { title: '排序', dataIndex: 'sortOrder', key: 'sortOrder', width: 80 },
     { title: '目录名称', dataIndex: 'name', key: 'name' },
-    {
-      title: '说明',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-    },
+    { title: '说明', dataIndex: 'description', key: 'description', ellipsis: true },
     {
       title: '操作',
       key: 'action',
       render: (_: any, record: ArchiveCategory) => (
         <Space>
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => openForm(record)}
-          >
+          <Button icon={<EditOutlined />} size="small" onClick={() => openForm(record)}>
             编辑
           </Button>
           <Button
@@ -173,14 +162,9 @@ export function ArchiveCatalogPage() {
       title: '是否必交',
       dataIndex: 'required',
       key: 'required',
-      render: (v: boolean) =>
-        v ? <Tag color="blue">必交</Tag> : <Tag>可选</Tag>,
+      render: (v: boolean) => (v ? <Tag color="blue">必交</Tag> : <Tag>可选</Tag>),
     },
-    {
-      title: '要求数量',
-      dataIndex: 'requiredQuantity',
-      key: 'requiredQuantity',
-    },
+    { title: '要求数量', dataIndex: 'requiredQuantity', key: 'requiredQuantity' },
     {
       title: '适用节点',
       dataIndex: 'applicableNodeId',
@@ -197,11 +181,7 @@ export function ArchiveCatalogPage() {
       key: 'action',
       render: (_: any, record: ArchiveRequirement) => (
         <Space>
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => openReqForm(record)}
-          >
+          <Button icon={<EditOutlined />} size="small" onClick={() => openReqForm(record)}>
             编辑
           </Button>
           <Button
@@ -222,11 +202,7 @@ export function ArchiveCatalogPage() {
       <Card
         title="归档目录"
         extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => openForm()}
-          >
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openForm()}>
             新增目录
           </Button>
         }
@@ -235,9 +211,7 @@ export function ArchiveCatalogPage() {
         <Table
           rowKey="id"
           columns={catalogColumns}
-          dataSource={[...archiveCategories].sort(
-            (a, b) => a.sortOrder - b.sortOrder
-          )}
+          dataSource={[...archiveCategories].sort((a, b) => a.sortOrder - b.sortOrder)}
           pagination={false}
         />
 
@@ -252,21 +226,13 @@ export function ArchiveCatalogPage() {
           }}
         >
           <Form form={form} layout="vertical" onFinish={handleSave}>
-            <Form.Item
-              label="目录名称"
-              name="name"
-              rules={[{ required: true }]}
-            >
+            <Form.Item label="目录名称" name="name" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
             <Form.Item label="说明" name="description">
               <TextArea rows={3} />
             </Form.Item>
-            <Form.Item
-              label="排序"
-              name="sortOrder"
-              rules={[{ required: true }]}
-            >
+            <Form.Item label="排序" name="sortOrder" rules={[{ required: true }]}>
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
           </Form>
@@ -285,16 +251,10 @@ export function ArchiveCatalogPage() {
               onChange={(v) => setSelectedCategory(v || '')}
             >
               {archiveCategories.map((c) => (
-                <Option key={c.id} value={c.id}>
-                  {c.name}
-                </Option>
+                <Option key={c.id} value={c.id}>{c.name}</Option>
               ))}
             </Select>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => openReqForm()}
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openReqForm()}>
               新增必交材料
             </Button>
           </Space>
@@ -318,46 +278,26 @@ export function ArchiveCatalogPage() {
           }}
         >
           <Form form={reqForm} layout="vertical" onFinish={handleSaveReq}>
-            <Form.Item
-              label="所属目录"
-              name="categoryId"
-              rules={[{ required: true }]}
-            >
+            <Form.Item label="所属目录" name="categoryId" rules={[{ required: true }]}>
               <Select placeholder="选择归档目录">
                 {archiveCategories.map((c) => (
-                  <Option key={c.id} value={c.id}>
-                    {c.name}
-                  </Option>
+                  <Option key={c.id} value={c.id}>{c.name}</Option>
                 ))}
               </Select>
             </Form.Item>
-            <Form.Item
-              label="材料名称"
-              name="name"
-              rules={[{ required: true }]}
-            >
+            <Form.Item label="材料名称" name="name" rules={[{ required: true }]}>
               <Input />
             </Form.Item>
-            <Form.Item
-              label="是否必交"
-              name="required"
-              valuePropName="checked"
-            >
+            <Form.Item label="是否必交" name="required" valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item
-              label="要求数量"
-              name="requiredQuantity"
-              rules={[{ required: true }]}
-            >
+            <Form.Item label="要求数量" name="requiredQuantity" rules={[{ required: true }]}>
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item label="适用节点" name="applicableNodeId">
               <Select allowClear placeholder="选择适用节点（可选）">
                 {nodes.map((n) => (
-                  <Option key={n.id} value={n.id}>
-                    {n.name}
-                  </Option>
+                  <Option key={n.id} value={n.id}>{n.name}</Option>
                 ))}
               </Select>
             </Form.Item>

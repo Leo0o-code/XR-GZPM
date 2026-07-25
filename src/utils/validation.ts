@@ -1,5 +1,7 @@
 import dayjs from 'dayjs';
 import type { Achievement, ApprovalValidation, IndicatorConfig, TimeNode, Topic } from '../types';
+import { ACHIEVEMENT_EVIDENCE_RULES } from '../types';
+import { PROGRESS_ORDERS } from './helpers';
 
 export interface ValidationError {
   field?: string;
@@ -8,12 +10,12 @@ export interface ValidationError {
 
 export const validateTopic = (topic: Topic): ValidationError[] => {
   const errors: ValidationError[] = [];
-  if (!topic.leadingUnit) errors.push({ field: 'leadingUnit', message: '课题必须配置牵头单位' });
+  if (!topic.leadingUnitId) errors.push({ field: 'leadingUnitId', message: '课题必须配置牵头单位' });
   return errors;
 };
 
-export const validateUnitBelongsToTopic = (topic: Topic, unitName: string): boolean => {
-  return topic.leadingUnit === unitName || topic.participatingUnits.includes(unitName);
+export const validateUnitBelongsToTopic = (topic: Topic, unitId: string): boolean => {
+  return topic.leadingUnitId === unitId || topic.participatingUnitIds.includes(unitId);
 };
 
 export const validateIndicator = (
@@ -26,17 +28,17 @@ export const validateIndicator = (
   const topic = topics.find((t) => t.id === indicator.topicId);
 
   if (!topic) { errors.push({ message: '所属课题不存在' }); return errors; }
-  if (!topic.leadingUnit) errors.push({ message: `课题 ${topic.name} 未配置牵头单位` });
-  if (!validateUnitBelongsToTopic(topic, indicator.unitName)) errors.push({ message: `责任单位 ${indicator.unitName} 不属于课题 ${topic.name}` });
+  if (!topic.leadingUnitId) errors.push({ message: `课题 ${topic.name} 未配置牵头单位` });
+  if (!validateUnitBelongsToTopic(topic, indicator.unitId)) errors.push({ message: `责任单位 ${indicator.unitId} 不属于课题 ${topic.name}` });
   if (indicator.plannedQuantity < 0) errors.push({ field: 'plannedQuantity', message: '成果数量不得为负数' });
 
   const duplicate = allIndicators.find(
-    (i) => i.id !== indicator.id && i.topicId === indicator.topicId && i.unitName === indicator.unitName && i.achievementType === indicator.achievementType && i.nodeId === indicator.nodeId
+    (i) => i.id !== indicator.id && i.topicId === indicator.topicId && i.unitId === indicator.unitId && i.achievementType === indicator.achievementType && i.nodeId === indicator.nodeId
   );
   if (duplicate) errors.push({ message: '同一课题、单位、成果类型和时间节点不得重复配置' });
 
   const sameGroup = allIndicators.filter(
-    (i) => i.topicId === indicator.topicId && i.unitName === indicator.unitName && i.achievementType === indicator.achievementType
+    (i) => i.topicId === indicator.topicId && i.unitId === indicator.unitId && i.achievementType === indicator.achievementType
   );
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
   const sorted = sameGroup.map((i) => ({ indicator: i, node: nodeMap.get(i.nodeId) })).filter((x) => x.node).sort((a, b) => a.node!.sortOrder - b.node!.sortOrder);
@@ -49,60 +51,174 @@ export const validateIndicator = (
   return errors;
 };
 
+// Duplicate achievement check
+export const checkDuplicateAchievement = (
+  achievement: Achievement,
+  allAchievements: Achievement[]
+): { isDuplicate: boolean; reason: string | undefined } => {
+  const others = allAchievements.filter((a) => a.id !== achievement.id);
+
+  switch (achievement.achievementType) {
+    case '学术论文': {
+      if (achievement.doi) {
+        const doiDup = others.find((a) => a.achievementType === '学术论文' && a.doi === achievement.doi);
+        if (doiDup) return { isDuplicate: true, reason: `DOI 重复：${achievement.doi}（已有成果「${doiDup.title}」）` };
+      }
+      // Normalize title for comparison
+      const normalizedTitle = achievement.title.replace(/\s+/g, ' ').trim().toLowerCase();
+      const titleDup = others.find(
+        (a) =>
+          a.achievementType === '学术论文' &&
+          a.title.replace(/\s+/g, ' ').trim().toLowerCase() === normalizedTitle
+      );
+      if (titleDup) return { isDuplicate: true, reason: `论文标题重复（已有成果「${titleDup.title}」）` };
+      break;
+    }
+    case '发明专利': {
+      if (achievement.applicationNumber) {
+        const appDup = others.find((a) => a.achievementType === '发明专利' && a.applicationNumber === achievement.applicationNumber);
+        if (appDup) return { isDuplicate: true, reason: `申请号重复：${achievement.applicationNumber}` };
+      }
+      if (achievement.receiptNumber) {
+        const recDup = others.find((a) => a.achievementType === '发明专利' && a.receiptNumber === achievement.receiptNumber);
+        if (recDup) return { isDuplicate: true, reason: `受理号重复：${achievement.receiptNumber}` };
+      }
+      break;
+    }
+    case '软件著作权': {
+      if (achievement.registrationNumber) {
+        const regDup = others.find((a) => a.achievementType === '软件著作权' && a.registrationNumber === achievement.registrationNumber);
+        if (regDup) return { isDuplicate: true, reason: `登记号重复：${achievement.registrationNumber}` };
+      }
+      break;
+    }
+    case '标准规范': {
+      const nameDup = others.find(
+        (a) =>
+          a.achievementType === '标准规范' &&
+          a.title.replace(/\s+/g, ' ').trim().toLowerCase() === achievement.title.replace(/\s+/g, ' ').trim().toLowerCase()
+      );
+      if (nameDup) return { isDuplicate: true, reason: `标准名称重复（已有「${nameDup.title}」）` };
+      break;
+    }
+    case '人才培养': {
+      if (achievement.studentName && achievement.thesisTitle) {
+        const dup = others.find(
+          (a) =>
+            a.achievementType === '人才培养' &&
+            a.studentName === achievement.studentName &&
+            a.thesisTitle === achievement.thesisTitle
+        );
+        if (dup) return { isDuplicate: true, reason: `学生姓名+论文题目重复（已有「${dup.studentName} / ${dup.thesisTitle}」）` };
+      }
+      break;
+    }
+  }
+  return { isDuplicate: false, reason: undefined };
+};
+
+// Evidence rule validation using ACHIEVEMENT_EVIDENCE_RULES
+export const validateEvidenceMaterials = (
+  achievement: Achievement
+): { passed: boolean; detail?: string } => {
+  const evidenceDef = ACHIEVEMENT_EVIDENCE_RULES[achievement.achievementType];
+  if (!evidenceDef) return { passed: true };
+
+  const uploadedApproved = achievement.materials
+    .filter((m) => m.status === '审核通过')
+    .map((m) => m.materialType);
+
+  const rule = evidenceDef.rule;
+  if (rule.type === 'SINGLE') {
+    // All SINGLE options must be uploaded and approved
+    const missing = rule.options.filter((opt) => !uploadedApproved.includes(opt));
+    if (missing.length > 0) {
+      return { passed: false, detail: `缺少已审核通过的材料：${missing.join('、')}` };
+    }
+  } else if (rule.type === 'OR') {
+    // At least one OR option must be uploaded and approved
+    const hasAny = rule.options.some((opt) => uploadedApproved.includes(opt));
+    if (!hasAny && rule.options.length > 0) {
+      return { passed: false, detail: `需至少上传以下材料之一：${rule.options.join(' 或 ')}` };
+    }
+  }
+  return { passed: true };
+};
+
 // 成果审批前系统自动校验
 export const validateAchievementForApproval = (
   achievement: Achievement,
   indicator?: IndicatorConfig,
-  node?: TimeNode
+  node?: TimeNode,
+  allAchievements?: Achievement[]
 ): ApprovalValidation => {
   const checks = [];
 
   // 1. 关联有效指标
-  const hasValidIndicator = !!indicator && indicator.status === '已发布' && indicator.enabled;
+  const hasValidIndicator = !!indicator;
   checks.push({
     label: '已关联有效指标',
     passed: hasValidIndicator,
-    detail: hasValidIndicator ? undefined : '未关联有效指标或指标已停用',
+    detail: hasValidIndicator ? undefined : '未关联有效指标',
   });
 
-  // 2. 成果进度是否达到认定状态
-  const progress = indicator ? achievement.progressStatus === indicator.recognitionStatus : true;
+  // 2. 成果进度是否达到认定状态（使用 PROGRESS_ORDERS 对比）
+  // Default required progress per achievement type
+  const defaultRequiredProgress: Record<string, string> = {
+    学术论文: '已录用',
+    发明专利: '已受理',
+    软件著作权: '已取得证书',
+    标准规范: '形成送审稿',
+    人才培养: '已取得证明材料',
+  };
+  const requiredProgress = defaultRequiredProgress[achievement.achievementType] || '';
+  const order = PROGRESS_ORDERS[achievement.achievementType] || [];
+  const currentIdx = order.indexOf(achievement.progressStatus);
+  const requiredIdx = order.indexOf(requiredProgress);
+  const progressMet = currentIdx >= requiredIdx;
   checks.push({
     label: '成果进度达到认定状态',
-    passed: progress,
-    detail: progress ? undefined : `当前进度「${achievement.progressStatus}」未达到认定状态「${indicator?.recognitionStatus}」`,
+    passed: progressMet,
+    detail: progressMet ? undefined : `当前进度「${achievement.progressStatus}」未达到认定状态「${requiredProgress}」`,
   });
 
-  // 3. 佐证材料是否齐全
-  const requiredMaterialTypes = indicator?.materialRequirements || [];
-  const hasAllMaterials = requiredMaterialTypes.every((mt) =>
-    achievement.materials.some((m) => m.materialType === mt || m.name === mt)
-  );
-  const materialCheck = hasAllMaterials && achievement.materials.length > 0;
-  const allApproved = achievement.materials.every((m) => m.status === '审核通过');
+  // 3. recognizedCompletionDate 是否已填写
+  const hasCompletionDate = !!achievement.recognizedCompletionDate;
   checks.push({
-    label: '佐证材料完整且审核通过',
-    passed: materialCheck && allApproved,
-    detail: !materialCheck ? '佐证材料不完整' : !allApproved ? '存在未审核或退回的材料' : undefined,
+    label: '已填写认定完成日期',
+    passed: hasCompletionDate,
+    detail: hasCompletionDate ? undefined : '未填写认定完成日期',
   });
 
-  // 4. 未发现重复成果
+  // 4. 佐证材料是否满足规则
+  const evidenceCheck = validateEvidenceMaterials(achievement);
+  checks.push({
+    label: `佐证材料满足认定条件（${ACHIEVEMENT_EVIDENCE_RULES[achievement.achievementType]?.displayText || '-'}）`,
+    passed: evidenceCheck.passed,
+    detail: evidenceCheck.detail,
+  });
+
+  // 5. 重复成果检查
+  let duplicateCheck = { isDuplicate: false, reason: undefined as string | undefined };
+  if (allAchievements) {
+    duplicateCheck = checkDuplicateAchievement(achievement, allAchievements);
+  }
   checks.push({
     label: '未发现重复成果',
-    passed: true,
-    detail: '基于题目和DOI等初步判断',
+    passed: !duplicateCheck.isDuplicate,
+    detail: duplicateCheck.reason || '基于题目和DOI等初步判断',
   });
 
-  // 5. 是否超过节点截止时间
-  if (node && achievement.plannedCompletionDate) {
-    const onTime = dayjs(achievement.plannedCompletionDate).isBefore(dayjs(node.deadline)) || dayjs(achievement.plannedCompletionDate).isSame(dayjs(node.deadline));
+  // 6. 是否超过节点截止时间
+  if (node && achievement.recognizedCompletionDate) {
+    const onTime = dayjs(achievement.recognizedCompletionDate).isBefore(dayjs(node.deadline)) || dayjs(achievement.recognizedCompletionDate).isSame(dayjs(node.deadline));
     checks.push({
-      label: '按计划时间交付',
+      label: '认定完成日期未超过节点截止时间',
       passed: onTime,
-      detail: onTime ? undefined : `计划完成时间 ${achievement.plannedCompletionDate} 已超过节点截止时间 ${node.deadline}`,
+      detail: onTime ? undefined : `认定完成日期 ${achievement.recognizedCompletionDate} 已超过节点截止时间 ${node.deadline}`,
     });
   } else {
-    checks.push({ label: '按计划时间交付', passed: true });
+    checks.push({ label: '认定完成日期未超过节点截止时间', passed: true });
   }
 
   return {

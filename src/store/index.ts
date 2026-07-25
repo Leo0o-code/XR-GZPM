@@ -1,59 +1,48 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
-  Achievement,
-  ArchiveCategory,
-  ArchiveMaterial,
-  ArchiveRequirement,
-  ChineseJournalConfig,
-  IndicatorConfig,
-  Project,
-  TimeNode,
-  Topic,
-  VersionRecord,
-  WarningRule,
+  Achievement, ArchiveCategory, ArchiveMaterial, ArchiveRequirement,
+  DomesticJournalConfig, IndicatorConfig, OperationRecord, Project,
+  ProjectUnit, TimeNode, Topic, WarningRule,
 } from '../types';
 import {
-  MOCK_ACHIEVEMENTS,
-  MOCK_ARCHIVE_CATEGORIES,
-  MOCK_ARCHIVE_MATERIALS,
-  MOCK_ARCHIVE_REQUIREMENTS,
-  MOCK_CHINESE_JOURNAL_CONFIG,
-  MOCK_INDICATORS,
-  MOCK_PROJECT,
-  MOCK_TIME_NODES,
-  MOCK_TOPICS,
-  MOCK_VERSION_RECORDS,
-  MOCK_WARNING_RULES,
+  MOCK_ACHIEVEMENTS, MOCK_ARCHIVE_CATEGORIES, MOCK_ARCHIVE_MATERIALS, MOCK_ARCHIVE_REQUIREMENTS,
+  MOCK_CHINESE_JOURNAL_CONFIG, MOCK_INDICATORS, MOCK_OPERATION_RECORDS,
+  MOCK_PROJECT, MOCK_TIME_NODES, MOCK_TOPICS, MOCK_UNITS, MOCK_WARNING_RULES,
 } from '../data/mock';
 
 interface AppState {
   project: Project;
+  units: ProjectUnit[];
   topics: Topic[];
   nodes: TimeNode[];
   indicators: IndicatorConfig[];
-  chineseJournalConfig: ChineseJournalConfig;
-  versionRecords: VersionRecord[];
+  domesticJournalConfig: DomesticJournalConfig;
   warningRules: WarningRule[];
   achievements: Achievement[];
   archiveCategories: ArchiveCategory[];
   archiveMaterials: ArchiveMaterial[];
   archiveRequirements: ArchiveRequirement[];
+  operationRecords: OperationRecord[];
+
+  addUnit: (unit: ProjectUnit) => void;
+  updateUnit: (id: string, updates: Partial<ProjectUnit>) => void;
+  removeUnit: (id: string) => void;
 
   addTopic: (topic: Topic) => void;
   updateTopic: (id: string, updates: Partial<Topic>) => void;
+  removeTopic: (id: string) => void;
 
   addNode: (node: TimeNode) => void;
   updateNode: (id: string, updates: Partial<TimeNode>) => void;
   removeNode: (id: string) => void;
 
   addIndicator: (indicator: IndicatorConfig) => void;
-  updateIndicator: (id: string, updates: Partial<IndicatorConfig>, reason: string, operator: string) => void;
-  publishIndicator: (id: string, operator: string) => void;
-  adjustIndicator: (id: string, updates: Partial<IndicatorConfig>, reason: string, operator: string) => void;
-  deactivateIndicator: (id: string, operator: string) => void;
+  updateIndicator: (id: string, updates: Partial<IndicatorConfig>) => void;
+  removeIndicator: (id: string) => void;
+  batchUpdateIndicators: (updates: { id: string; plannedQuantity: number }[]) => void;
 
-  updateChineseJournalConfig: (updates: Partial<ChineseJournalConfig>) => void;
+  updateDomesticJournalConfig: (updates: Partial<DomesticJournalConfig>) => void;
 
   updateWarningRule: (id: string, updates: Partial<WarningRule>) => void;
 
@@ -70,171 +59,83 @@ interface AppState {
   addArchiveMaterial: (material: ArchiveMaterial) => void;
   updateArchiveMaterial: (id: string, updates: Partial<ArchiveMaterial>) => void;
   removeArchiveMaterial: (id: string) => void;
-
   addArchiveRequirement: (req: ArchiveRequirement) => void;
   updateArchiveRequirement: (id: string, updates: Partial<ArchiveRequirement>) => void;
   removeArchiveRequirement: (id: string) => void;
+
+  addOperationRecord: (record: OperationRecord) => void;
 
   resetToMock: () => void;
 }
 
 const buildInitialState = () => ({
   project: MOCK_PROJECT,
+  units: MOCK_UNITS,
   topics: MOCK_TOPICS,
   nodes: MOCK_TIME_NODES,
   indicators: MOCK_INDICATORS,
-  chineseJournalConfig: MOCK_CHINESE_JOURNAL_CONFIG,
-  versionRecords: MOCK_VERSION_RECORDS,
+  domesticJournalConfig: MOCK_CHINESE_JOURNAL_CONFIG,
   warningRules: MOCK_WARNING_RULES,
   achievements: MOCK_ACHIEVEMENTS,
   archiveCategories: MOCK_ARCHIVE_CATEGORIES,
   archiveMaterials: MOCK_ARCHIVE_MATERIALS,
   archiveRequirements: MOCK_ARCHIVE_REQUIREMENTS,
+  operationRecords: MOCK_OPERATION_RECORDS,
 });
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       ...buildInitialState(),
 
-      addTopic: (topic) => set((state) => ({ topics: [...state.topics, topic] })),
-      updateTopic: (id, updates) =>
-        set((state) => ({
-          topics: state.topics.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-        })),
+      addUnit: (unit) => set((s) => ({ units: [...s.units, unit] })),
+      updateUnit: (id, updates) => set((s) => ({ units: s.units.map((u) => (u.id === id ? { ...u, ...updates } : u)) })),
+      removeUnit: (id) => set((s) => ({ units: s.units.filter((u) => u.id !== id) })),
 
-      addNode: (node) => set((state) => ({ nodes: [...state.nodes, node] })),
-      updateNode: (id, updates) =>
-        set((state) => ({
-          nodes: state.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n)),
-        })),
-      removeNode: (id) =>
-        set((state) => ({ nodes: state.nodes.filter((n) => n.id !== id) })),
+      addTopic: (topic) => set((s) => ({ topics: [...s.topics, topic] })),
+      updateTopic: (id, updates) => set((s) => ({ topics: s.topics.map((t) => (t.id === id ? { ...t, ...updates } : t)) })),
+      removeTopic: (id) => set((s) => ({ topics: s.topics.filter((t) => t.id !== id) })),
 
-      addIndicator: (indicator) =>
-        set((state) => ({ indicators: [...state.indicators, indicator] })),
+      addNode: (node) => set((s) => ({ nodes: [...s.nodes, node] })),
+      updateNode: (id, updates) => set((s) => ({ nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...updates } : n)) })),
+      removeNode: (id) => set((s) => ({ nodes: s.nodes.filter((n) => n.id !== id) })),
 
-      updateIndicator: (id, updates, reason, operator) => {
-        const state = get();
-        const indicator = state.indicators.find((i) => i.id === id);
-        if (!indicator) return;
-
-        const records: VersionRecord[] = [];
-        Object.entries(updates).forEach(([key, value]) => {
-          const field = key as keyof IndicatorConfig;
-          if (indicator[field] !== value) {
-            records.push({
-              id: `vr-${Date.now()}-${key}`,
-              projectId: indicator.projectId,
-              version: indicator.version + 1,
-              configId: indicator.id,
-              fieldName: key,
-              beforeValue: String(indicator[field]),
-              afterValue: String(value),
-              reason,
-              operator,
-              operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-              effectiveDate: updates.effectiveDate || new Date().toISOString().split('T')[0],
-            });
-          }
-        });
-
-        set({
-          indicators: state.indicators.map((i) =>
-            i.id === id
-              ? { ...i, ...updates, version: i.version + (records.length > 0 ? 1 : 0) }
-              : i
-          ),
-          versionRecords: [...state.versionRecords, ...records],
-        });
-      },
-
-      publishIndicator: (id, operator) => {
-        get().updateIndicator(id, { status: '已发布', effectiveDate: new Date().toISOString().split('T')[0] }, '发布配置', operator);
-      },
-
-      adjustIndicator: (id, updates, reason, operator) => {
-        get().updateIndicator(id, { ...updates, status: '已调整' }, reason, operator);
-      },
-
-      deactivateIndicator: (id, operator) => {
-        get().updateIndicator(id, { status: '已停用', enabled: false }, '停用配置', operator);
-      },
-
-      updateChineseJournalConfig: (updates) =>
-        set((state) => ({ chineseJournalConfig: { ...state.chineseJournalConfig, ...updates } })),
-
-      updateWarningRule: (id, updates) =>
-        set((state) => ({
-          warningRules: state.warningRules.map((r) => (r.id === id ? { ...r, ...updates } : r)),
-        })),
-
-      addAchievement: (achievement) =>
-        set((state) => ({ achievements: [...state.achievements, achievement] })),
-
-      updateAchievement: (id, updates) =>
-        set((state) => ({
-          achievements: state.achievements.map((a) =>
-            a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : a
-          ),
-        })),
-
-      submitAchievement: (id) =>
-        set((state) => ({
-          achievements: state.achievements.map((a) =>
-            a.id === id
-              ? { ...a, status: '已提交', submittedAt: new Date().toISOString().split('T')[0], updatedAt: new Date().toISOString().split('T')[0] }
-              : a
-          ),
-        })),
-
-      approveAchievement: (id, payload, approver) => {
+      addIndicator: (indicator) => set((s) => ({ indicators: [...s.indicators, indicator] })),
+      updateIndicator: (id, updates) => set((s) => ({
+        indicators: s.indicators.map((i) => (i.id === id ? { ...i, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : i)),
+      })),
+      removeIndicator: (id) => set((s) => ({ indicators: s.indicators.filter((i) => i.id !== id) })),
+      batchUpdateIndicators: (updates) => set((s) => {
+        const map = new Map(updates.map((u) => [u.id, u.plannedQuantity]));
         const today = new Date().toISOString().split('T')[0];
-        set((state) => ({
-          achievements: state.achievements.map((a) =>
-            a.id === id
-              ? { ...a, ...payload, status: '审批通过', approver, approvedAt: today, updatedAt: today }
-              : a
-          ),
-        }));
-      },
+        return { indicators: s.indicators.map((i) => map.has(i.id) ? { ...i, plannedQuantity: map.get(i.id)!, updatedAt: today } : i) };
+      }),
 
-      rejectAchievement: (id, reason, approver) => {
-        const today = new Date().toISOString().split('T')[0];
-        set((state) => ({
-          achievements: state.achievements.map((a) =>
-            a.id === id
-              ? { ...a, status: '审批不通过', approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false }
-              : a
-          ),
-        }));
-      },
+      updateDomesticJournalConfig: (updates) => set((s) => ({ domesticJournalConfig: { ...s.domesticJournalConfig, ...updates } })),
 
-      returnAchievement: (id, reason, approver) => {
-        const today = new Date().toISOString().split('T')[0];
-        set((state) => ({
-          achievements: state.achievements.map((a) =>
-            a.id === id
-              ? { ...a, status: '退回修改', approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false }
-              : a
-          ),
-        }));
-      },
+      updateWarningRule: (id, updates) => set((s) => ({ warningRules: s.warningRules.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
 
-      addArchiveCategory: (category) => set((state) => ({ archiveCategories: [...state.archiveCategories, category] })),
-      updateArchiveCategory: (id, updates) => set((state) => ({ archiveCategories: state.archiveCategories.map((c) => (c.id === id ? { ...c, ...updates } : c)) })),
-      removeArchiveCategory: (id) => set((state) => ({ archiveCategories: state.archiveCategories.filter((c) => c.id !== id) })),
+      addAchievement: (achievement) => set((s) => ({ achievements: [...s.achievements, achievement] })),
+      updateAchievement: (id, updates) => set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : a)) })),
+      submitAchievement: (id) => set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, status: '已提交' as const, submittedAt: new Date().toISOString().split('T')[0], updatedAt: new Date().toISOString().split('T')[0] } : a)) })),
+      approveAchievement: (id, payload, approver) => { const today = new Date().toISOString().split('T')[0]; set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, ...payload, status: '审批通过' as const, approver, approvedAt: today, updatedAt: today } : a)) })); },
+      rejectAchievement: (id, reason, approver) => { const today = new Date().toISOString().split('T')[0]; set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, status: '审批不通过' as const, approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false } : a)) })); },
+      returnAchievement: (id, reason, approver) => { const today = new Date().toISOString().split('T')[0]; set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, status: '退回修改' as const, approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false } : a)) })); },
 
-      addArchiveMaterial: (material) => set((state) => ({ archiveMaterials: [...state.archiveMaterials, material] })),
-      updateArchiveMaterial: (id, updates) => set((state) => ({ archiveMaterials: state.archiveMaterials.map((m) => (m.id === id ? { ...m, ...updates } : m)) })),
-      removeArchiveMaterial: (id) => set((state) => ({ archiveMaterials: state.archiveMaterials.filter((m) => m.id !== id) })),
+      addArchiveCategory: (c) => set((s) => ({ archiveCategories: [...s.archiveCategories, c] })),
+      updateArchiveCategory: (id, u) => set((s) => ({ archiveCategories: s.archiveCategories.map((c) => (c.id === id ? { ...c, ...u } : c)) })),
+      removeArchiveCategory: (id) => set((s) => ({ archiveCategories: s.archiveCategories.filter((c) => c.id !== id) })),
+      addArchiveMaterial: (m) => set((s) => ({ archiveMaterials: [...s.archiveMaterials, m] })),
+      updateArchiveMaterial: (id, u) => set((s) => ({ archiveMaterials: s.archiveMaterials.map((m) => (m.id === id ? { ...m, ...u } : m)) })),
+      removeArchiveMaterial: (id) => set((s) => ({ archiveMaterials: s.archiveMaterials.filter((m) => m.id !== id) })),
+      addArchiveRequirement: (r) => set((s) => ({ archiveRequirements: [...s.archiveRequirements, r] })),
+      updateArchiveRequirement: (id, u) => set((s) => ({ archiveRequirements: s.archiveRequirements.map((r) => (r.id === id ? { ...r, ...u } : r)) })),
+      removeArchiveRequirement: (id) => set((s) => ({ archiveRequirements: s.archiveRequirements.filter((r) => r.id !== id) })),
 
-      addArchiveRequirement: (req) => set((state) => ({ archiveRequirements: [...state.archiveRequirements, req] })),
-      updateArchiveRequirement: (id, updates) => set((state) => ({ archiveRequirements: state.archiveRequirements.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
-      removeArchiveRequirement: (id) => set((state) => ({ archiveRequirements: state.archiveRequirements.filter((r) => r.id !== id) })),
+      addOperationRecord: (record) => set((s) => ({ operationRecords: [...s.operationRecords, record] })),
 
       resetToMock: () => set(buildInitialState()),
     }),
-    { name: 'research-achievement-storage-v3' }
+    { name: 'research-achievement-storage-v4' }
   )
 );

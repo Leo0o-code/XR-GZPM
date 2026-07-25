@@ -5,11 +5,12 @@ import { useAppStore } from '../../store';
 const { Option } = Select;
 
 export function MaterialQueryPage() {
-  const { archiveCategories, archiveMaterials, achievements } = useAppStore();
+  const { archiveCategories, archiveMaterials, achievements, units } = useAppStore();
   const [filter, setFilter] = useState({ categoryId: '', keyword: '', uploader: '' });
 
   const categoryMap = Object.fromEntries(archiveCategories.map((c) => [c.id, c]));
   const achievementMap = Object.fromEntries(achievements.map((a) => [a.id, a]));
+  const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
 
   const filtered = archiveMaterials.filter((m) => {
     return (
@@ -29,10 +30,21 @@ export function MaterialQueryPage() {
     },
     { title: '文件名', dataIndex: 'fileName', key: 'fileName' },
     {
+      title: '要求ID',
+      dataIndex: 'requirementId',
+      key: 'requirementId',
+      render: (v?: string) => v || '-',
+    },
+    {
       title: '关联成果',
       dataIndex: 'sourceAchievementId',
       key: 'sourceAchievementId',
-      render: (v?: string) => (v ? achievementMap[v]?.title || v : '-'),
+      render: (v?: string) => {
+        if (!v) return '-';
+        const ach = achievementMap[v];
+        if (!ach) return v;
+        return `${ach.title}（${unitMap[ach.unitId] || ach.unitId}）`;
+      },
     },
     { title: '上传人', dataIndex: 'uploader', key: 'uploader' },
     { title: '上传时间', dataIndex: 'uploadedAt', key: 'uploadedAt' },
