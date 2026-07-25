@@ -1,4 +1,4 @@
-﻿// 项目
+// 项目
 export interface Project {
   id: string;
   name: string;
@@ -13,86 +13,221 @@ export interface Topic {
   projectId: string;
   name: string;
   code: string;
-  responsibleUnit: string;
-  leader: string;
+  leadingUnit: string;
+  participatingUnits: string[];
+  remarks: string;
 }
 
 // 成果类型
-export type AchievementType = '论文' | '专利' | '软件著作权' | '标准规范' | '人才培养';
+export type AchievementType = '学术论文' | '发明专利' | '软件著作权' | '标准规范' | '人才培养';
 
 export const ACHIEVEMENT_TYPES: AchievementType[] = [
-  '论文',
-  '专利',
+  '学术论文',
+  '发明专利',
   '软件著作权',
   '标准规范',
   '人才培养',
 ];
 
-// 考核节点
-export type AssessmentNode = '中期' | '结项' | string;
+// 论文类型
+export type PaperType = 'SCI' | 'EI' | '中文核心';
 
-export const DEFAULT_NODES: AssessmentNode[] = ['中期', '结项'];
+// 人才培养层次
+export type EducationLevel = '博士' | '硕士';
 
-// 配置状态
-export type ConfigStatus = '草稿' | '已发布' | '已调整' | '已停用';
+// 成果状态
+export type AchievementStatus =
+  | '草稿'
+  | '已提交'
+  | '审批中'
+  | '审批通过'
+  | '审批不通过'
+  | '退回修改';
 
-// 预警等级
-export type WarningLevel = 'yellow' | 'orange' | 'red';
+export const ACHIEVEMENT_STATUS: AchievementStatus[] = [
+  '草稿',
+  '已提交',
+  '审批中',
+  '审批通过',
+  '审批不通过',
+  '退回修改',
+];
 
-// 指标配置项
+// 时间节点
+export interface TimeNode {
+  id: string;
+  projectId: string;
+  name: string;
+  deadline: string;
+  description: string;
+  participatesInWarning: boolean;
+  enabled: boolean;
+  sortOrder: number;
+}
+
+// 指标状态
+export type IndicatorStatus = '草稿' | '已发布' | '已调整' | '已停用';
+
+// 指标配置（细化到单位/成果类型/节点）
 export interface IndicatorConfig {
   id: string;
   projectId: string;
   topicId: string;
+  unitName: string;
   achievementType: AchievementType;
-  node: AssessmentNode;
+  nodeId: string;
   plannedQuantity: number;
-  deadline: string;
   recognitionStatus: string;
   materialRequirements: string[];
-  earlyWarningDays: number[];
   enabled: boolean;
   remarks: string;
-  status: ConfigStatus;
+  status: IndicatorStatus;
   version: number;
   versionId: string;
   effectiveDate: string;
 }
 
-// 分批交付节点
-export interface BatchNode {
+// 佐证材料
+export interface AchievementMaterial {
+  id: string;
+  achievementId: string;
+  name: string;
+  status: '未提交' | '已提交' | '审核中' | '审核通过' | '被退回';
+  submittedAt?: string;
+  reviewedAt?: string;
+}
+
+// 成果（统一结构，按类型使用对应可选字段）
+export interface Achievement {
   id: string;
   projectId: string;
   topicId: string;
+  unitName: string;
   achievementType: AchievementType;
-  name: string;
-  deadline: string;
-  cumulativeQuantity: number;
+
+  // 通用字段
+  title: string;
+  responsiblePerson: string;
+  status: AchievementStatus;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt?: string;
+  remarks: string;
+
+  // 审批相关
+  approvalOpinion?: string;
+  approvedAt?: string;
+  approver?: string;
+  countsToIndicator: boolean;
+
+  // 论文特有
+  isRepresentative?: boolean;
+  isChineseJournal?: boolean;
+  chineseJournalReason?: string;
+  paperType?: PaperType;
+  journalName?: string;
+  cnNumber?: string;
+  issn?: string;
+  doi?: string;
+  firstAuthor?: string;
+  correspondingAuthor?: string;
+  allAuthors?: string;
+  submissionDate?: string;
+  acceptanceDate?: string;
+  publicationDate?: string;
+  projectLabeling?: string;
+
+  // 发明专利特有
+  patentScope?: '国内' | '国际';
+  applicant?: string;
+  inventors?: string;
+  applicationNumber?: string;
+  receiptNumber?: string;
+  applicationDate?: string;
+  receiptDate?: string;
+  grantDate?: string;
+  grantPublicationNumber?: string;
+  legalStatus?: string;
+
+  // 软件著作权特有
+  shortName?: string;
+  version?: string;
+  copyrightOwner?: string;
+  developers?: string;
+  completionDate?: string;
+  registrationApplicationDate?: string;
+  registrationNumber?: string;
+  certificateDate?: string;
+
+  // 标准规范特有
+  standardLevel?: string;
+  leadingUnit?: string;
+  participatingUnits?: string;
+  drafters?: string;
+  responsibleOrganization?: string;
+  currentStage?: string;
+  draftSubmissionDate?: string;
+  draftCommitDate?: string;
+
+  // 人才培养特有
+  studentName?: string;
+  educationLevel?: EducationLevel;
+  trainingUnit?: string;
+  supervisorName?: string;
+  thesisTitle?: string;
+  enrollmentDate?: string;
+  expectedGraduationDate?: string;
+  actualGraduationDate?: string;
+  trainingStatus?: string;
+
+  materials: AchievementMaterial[];
 }
 
-// 中国科技期刊论文配置
+// 预警等级
+export type WarningLevel = 'yellow' | 'orange' | 'red';
+
+// 预警类型
+export type WarningType = 'time' | 'quantity_gap' | 'chinese_journal_ratio';
+
+export interface WarningLevelConfig {
+  level: WarningLevel;
+  advanceDays: number;
+  completionRateThreshold: number;
+}
+
+export interface WarningRule {
+  id: string;
+  projectId: string;
+  type: WarningType;
+  name: string;
+  levels: WarningLevelConfig[];
+  enabled: boolean;
+}
+
+export interface WarningResult {
+  id: string;
+  type: WarningType;
+  level: WarningLevel;
+  title: string;
+  message: string;
+  topicId?: string;
+  unitName?: string;
+  achievementType?: AchievementType;
+  nodeId?: string;
+  deadline?: string;
+  daysRemaining?: number;
+  gap?: number;
+}
+
+// 中国科技期刊配置
 export interface ChineseJournalConfig {
   id: string;
   projectId: string;
-  totalRepresentativePapers: number;
   minChineseJournalCount: number;
   minChineseJournalRatio: number;
-  assessAtProjectLevel: boolean;
   decomposeToTopics: boolean;
   topicMinCounts: Record<string, number>;
-  journalListVersion: string;
   effectiveDate: string;
-}
-
-// 期刊名录条目
-export interface JournalEntry {
-  id: string;
-  name: string;
-  issn: string;
-  publisher: string;
-  category: string;
-  version: string;
-  addedAt: string;
 }
 
 // 版本记录
@@ -110,94 +245,51 @@ export interface VersionRecord {
   effectiveDate: string;
 }
 
-// 预警规则
-export interface WarningRule {
+// 归档目录
+export interface ArchiveCategory {
   id: string;
   projectId: string;
-  type: WarningType;
   name: string;
-  yellowThreshold: number | string;
-  orangeThreshold: number | string;
-  redThreshold: number | string;
-  enabled: boolean;
+  description: string;
+  parentId?: string;
+  sortOrder: number;
 }
 
-export type WarningType =
-  | 'time'
-  | 'quantity_gap'
-  | 'progress_insufficient'
-  | 'material'
-  | 'chinese_journal_ratio'
-  | 'undecomposed';
-
-export const WARNING_TYPES: { value: WarningType; label: string }[] = [
-  { value: 'time', label: '时间预警' },
-  { value: 'quantity_gap', label: '数量缺口预警' },
-  { value: 'progress_insufficient', label: '进度不足预警' },
-  { value: 'material', label: '佐证材料预警' },
-  { value: 'chinese_journal_ratio', label: '我国科技期刊比例预警' },
-  { value: 'undecomposed', label: '未分解指标预警' },
-];
-
-// 成果登记
-export interface Achievement {
+// 归档材料
+export interface ArchiveMaterial {
   id: string;
   projectId: string;
-  topicId: string;
-  achievementType: AchievementType;
-  title: string;
-  responsiblePerson: string;
-  currentStage: string;
-  stageOrder: number;
-  totalStages: number;
-  status: string;
-  materials: Material[];
-  officeRecognized: boolean;
-  isDuplicate: boolean;
-  isChineseJournal: boolean;
-  journalId?: string;
-  registeredAt: string;
-}
-
-// 佐证材料
-export interface Material {
-  id: string;
-  achievementId: string;
+  categoryId: string;
   name: string;
-  status: '未提交' | '已提交' | '审核中' | '审核通过' | '被退回';
-  submittedAt?: string;
-  reviewedAt?: string;
+  fileName: string;
+  fileUrl?: string;
+  sourceAchievementId?: string;
+  uploader: string;
+  uploadedAt: string;
+  remarks: string;
 }
 
 // 完成统计
 export interface CompletionStats {
-  topicId: string;
+  viewKey: string;
+  topicId?: string;
+  unitName?: string;
   achievementType: AchievementType;
-  node: AssessmentNode;
+  nodeId: string;
+  nodeName: string;
+  deadline: string;
   plannedQuantity: number;
   registeredCount: number;
-  progressMetCount: number;
-  materialsSubmittedCount: number;
-  materialsApprovedCount: number;
   recognizedCount: number;
   missingCount: number;
   completionRate: number;
 }
 
-// 预警结果
-export interface WarningResult {
-  id: string;
-  type: WarningType;
-  level: WarningLevel;
-  title: string;
-  message: string;
-  topicId?: string;
-  achievementType?: AchievementType;
-  node?: AssessmentNode;
-  deadline?: string;
-  daysRemaining?: number;
-  gap?: number;
+// 归档监控统计
+export interface ArchiveMonitoringStats {
+  categoryId: string;
+  categoryName: string;
+  totalCount: number;
+  uploadedCount: number;
+  missingCount: number;
 }
-
-// 用户角色
-export type UserRole = 'admin' | 'topic';

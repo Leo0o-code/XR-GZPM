@@ -1,11 +1,12 @@
-﻿import type {
+import type {
   Achievement,
-  BatchNode,
+  AchievementMaterial,
+  ArchiveCategory,
+  ArchiveMaterial,
   ChineseJournalConfig,
   IndicatorConfig,
-  JournalEntry,
-  Material,
   Project,
+  TimeNode,
   Topic,
   VersionRecord,
   WarningRule,
@@ -13,130 +14,601 @@
 
 export const MOCK_PROJECT: Project = {
   id: 'p1',
-  name: '国重项目示范',
+  name: '国家科技重大专项示范',
   code: 'GZ-2025-001',
   startDate: '2025-01-01',
   endDate: '2028-12-31',
 };
 
 export const MOCK_TOPICS: Topic[] = [
-  { id: 't1', projectId: 'p1', name: '课题1', code: 'K1', responsibleUnit: '清华大学', leader: '张三' },
-  { id: 't2', projectId: 'p1', name: '课题2', code: 'K2', responsibleUnit: '北京大学', leader: '李四' },
-  { id: 't3', projectId: 'p1', name: '课题3', code: 'K3', responsibleUnit: '中科院', leader: '王五' },
-  { id: 't4', projectId: 'p1', name: '课题4', code: 'K4', responsibleUnit: '浙江大学', leader: '赵六' },
-  { id: 't5', projectId: 'p1', name: '课题5', code: 'K5', responsibleUnit: '华中科技大学', leader: '孙七' },
+  {
+    id: 't1',
+    projectId: 'p1',
+    name: '课题1：总体架构与关键技术研究',
+    code: 'K1',
+    leadingUnit: '清华大学',
+    participatingUnits: ['北京大学', '中科院计算所'],
+    remarks: '',
+  },
+  {
+    id: 't2',
+    projectId: 'p1',
+    name: '课题2：核心算法研究与验证',
+    code: 'K2',
+    leadingUnit: '北京大学',
+    participatingUnits: ['清华大学', '浙江大学'],
+    remarks: '',
+  },
+  {
+    id: 't3',
+    projectId: 'p1',
+    name: '课题3：系统平台研发',
+    code: 'K3',
+    leadingUnit: '中科院计算所',
+    participatingUnits: ['华中科技大学', '浙江大学'],
+    remarks: '',
+  },
+  {
+    id: 't4',
+    projectId: 'p1',
+    name: '课题4：示范应用与集成',
+    code: 'K4',
+    leadingUnit: '浙江大学',
+    participatingUnits: ['清华大学', '华中科技大学'],
+    remarks: '',
+  },
+  {
+    id: 't5',
+    projectId: 'p1',
+    name: '课题5：测试评估与标准规范',
+    code: 'K5',
+    leadingUnit: '华中科技大学',
+    participatingUnits: ['北京大学', '中科院计算所'],
+    remarks: '',
+  },
 ];
 
-const today = new Date().toISOString().split('T')[0];
-const midTerm = '2026-12-31';
-const finalTerm = '2028-12-31';
-
-export const MOCK_INDICATORS: IndicatorConfig[] = [
-  // 课题1
-  { id: 'i1', projectId: 'p1', topicId: 't1', achievementType: '论文', node: '中期', plannedQuantity: 4, deadline: midTerm, recognitionStatus: '已录用', materialRequirements: ['录用通知', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i2', projectId: 'p1', topicId: 't1', achievementType: '论文', node: '结项', plannedQuantity: 7, deadline: finalTerm, recognitionStatus: '已发表', materialRequirements: ['发表证明', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i3', projectId: 'p1', topicId: 't1', achievementType: '专利', node: '中期', plannedQuantity: 6, deadline: midTerm, recognitionStatus: '已受理', materialRequirements: ['受理通知书'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i4', projectId: 'p1', topicId: 't1', achievementType: '专利', node: '结项', plannedQuantity: 10, deadline: finalTerm, recognitionStatus: '已授权', materialRequirements: ['授权证书'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i5', projectId: 'p1', topicId: 't1', achievementType: '软件著作权', node: '中期', plannedQuantity: 4, deadline: midTerm, recognitionStatus: '已取得证书', materialRequirements: ['登记证书'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i6', projectId: 'p1', topicId: 't1', achievementType: '软件著作权', node: '结项', plannedQuantity: 7, deadline: finalTerm, recognitionStatus: '已取得证书', materialRequirements: ['登记证书'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  // 课题2
-  { id: 'i7', projectId: 'p1', topicId: 't2', achievementType: '论文', node: '中期', plannedQuantity: 3, deadline: midTerm, recognitionStatus: '已录用', materialRequirements: ['录用通知', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i8', projectId: 'p1', topicId: 't2', achievementType: '论文', node: '结项', plannedQuantity: 6, deadline: finalTerm, recognitionStatus: '已发表', materialRequirements: ['发表证明', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  // 课题3
-  { id: 'i9', projectId: 'p1', topicId: 't3', achievementType: '论文', node: '中期', plannedQuantity: 5, deadline: midTerm, recognitionStatus: '已录用', materialRequirements: ['录用通知', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i10', projectId: 'p1', topicId: 't3', achievementType: '论文', node: '结项', plannedQuantity: 8, deadline: finalTerm, recognitionStatus: '已发表', materialRequirements: ['发表证明', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  // 课题4
-  { id: 'i11', projectId: 'p1', topicId: 't4', achievementType: '论文', node: '中期', plannedQuantity: 2, deadline: midTerm, recognitionStatus: '已录用', materialRequirements: ['录用通知', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i12', projectId: 'p1', topicId: 't4', achievementType: '论文', node: '结项', plannedQuantity: 5, deadline: finalTerm, recognitionStatus: '已发表', materialRequirements: ['发表证明', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  // 课题5
-  { id: 'i13', projectId: 'p1', topicId: 't5', achievementType: '论文', node: '中期', plannedQuantity: 3, deadline: midTerm, recognitionStatus: '已录用', materialRequirements: ['录用通知', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
-  { id: 'i14', projectId: 'p1', topicId: 't5', achievementType: '论文', node: '结项', plannedQuantity: 6, deadline: finalTerm, recognitionStatus: '已发表', materialRequirements: ['发表证明', '论文全文'], earlyWarningDays: [90, 60, 30], enabled: true, remarks: '', status: '已发布', version: 1, versionId: 'v1', effectiveDate: '2025-01-01' },
+export const MOCK_TIME_NODES: TimeNode[] = [
+  {
+    id: 'node-1',
+    projectId: 'p1',
+    name: '第一年度',
+    deadline: '2025-12-31',
+    description: '项目启动后第一年度检查节点',
+    participatesInWarning: true,
+    enabled: true,
+    sortOrder: 1,
+  },
+  {
+    id: 'node-2',
+    projectId: 'p1',
+    name: '第二年度',
+    deadline: '2026-12-31',
+    description: '项目启动后第二年度检查节点',
+    participatesInWarning: true,
+    enabled: true,
+    sortOrder: 2,
+  },
+  {
+    id: 'node-3',
+    projectId: 'p1',
+    name: '中期检查',
+    deadline: '2027-06-30',
+    description: '项目中期检查节点',
+    participatesInWarning: true,
+    enabled: true,
+    sortOrder: 3,
+  },
+  {
+    id: 'node-4',
+    projectId: 'p1',
+    name: '系统试运行',
+    deadline: '2027-12-31',
+    description: '系统平台试运行节点',
+    participatesInWarning: true,
+    enabled: true,
+    sortOrder: 4,
+  },
+  {
+    id: 'node-5',
+    projectId: 'p1',
+    name: '项目结项',
+    deadline: '2028-12-31',
+    description: '项目最终结项验收节点',
+    participatesInWarning: true,
+    enabled: true,
+    sortOrder: 5,
+  },
 ];
 
-export const MOCK_BATCH_NODES: BatchNode[] = [
-  { id: 'b1', projectId: 'p1', topicId: 't1', achievementType: '专利', name: '阶段性节点1', deadline: '2027-12-31', cumulativeQuantity: 3 },
-  { id: 'b2', projectId: 'p1', topicId: 't1', achievementType: '专利', name: '中期检查', deadline: midTerm, cumulativeQuantity: 6 },
-  { id: 'b3', projectId: 'p1', topicId: 't1', achievementType: '专利', name: '项目结项', deadline: finalTerm, cumulativeQuantity: 10 },
+const defaultRecognitionStatus: Record<string, string> = {
+  学术论文: '已录用',
+  发明专利: '已受理',
+  软件著作权: '已取得证书',
+  标准规范: '形成送审稿',
+  人才培养: '已取得证明材料',
+};
+
+const defaultMaterialRequirements: Record<string, string[]> = {
+  学术论文: ['录用通知', '论文全文', '正式刊出页面', '检索证明'],
+  发明专利: ['专利受理通知书', '授权通知书', '专利证书'],
+  软件著作权: ['软件著作权登记证书'],
+  标准规范: ['标准送审稿', '送审提交证明', '编制说明'],
+  人才培养: ['学位论文', '答辩证明', '学位授予证明'],
+};
+
+export const MOCK_INDICATORS: IndicatorConfig[] = [];
+
+let indicatorIdCounter = 1;
+
+MOCK_TOPICS.forEach((topic) => {
+  const units = [topic.leadingUnit, ...topic.participatingUnits];
+  const types: Array<'学术论文' | '发明专利' | '软件著作权' | '标准规范' | '人才培养'> = [
+    '学术论文',
+    '发明专利',
+    '软件著作权',
+  ];
+  if (topic.code === 'K5') {
+    types.push('标准规范');
+  }
+  if (topic.code === 'K1' || topic.code === 'K2') {
+    types.push('人才培养');
+  }
+
+  units.forEach((unit) => {
+    types.forEach((type) => {
+      MOCK_TIME_NODES.forEach((node) => {
+        let base = 0;
+        if (type === '学术论文') base = 1;
+        if (type === '发明专利') base = 1;
+        if (type === '软件著作权') base = 1;
+        const cumulative = base * node.sortOrder;
+        MOCK_INDICATORS.push({
+          id: `ind-${indicatorIdCounter++}`,
+          projectId: 'p1',
+          topicId: topic.id,
+          unitName: unit,
+          achievementType: type,
+          nodeId: node.id,
+          plannedQuantity: cumulative,
+          recognitionStatus: defaultRecognitionStatus[type],
+          materialRequirements: defaultMaterialRequirements[type],
+          enabled: true,
+          remarks: '',
+          status: '已发布',
+          version: 1,
+          versionId: 'v1',
+          effectiveDate: '2025-01-01',
+        });
+      });
+    });
+  });
+});
+
+export const MOCK_WARNING_RULES: WarningRule[] = [
+  {
+    id: 'wr-time',
+    projectId: 'p1',
+    type: 'time',
+    name: '时间预警',
+    levels: [
+      { level: 'yellow', advanceDays: 90, completionRateThreshold: 80 },
+      { level: 'orange', advanceDays: 30, completionRateThreshold: 60 },
+      { level: 'red', advanceDays: 0, completionRateThreshold: 40 },
+    ],
+    enabled: true,
+  },
+  {
+    id: 'wr-quantity',
+    projectId: 'p1',
+    type: 'quantity_gap',
+    name: '数量缺口预警',
+    levels: [
+      { level: 'yellow', advanceDays: 0, completionRateThreshold: 80 },
+      { level: 'orange', advanceDays: 0, completionRateThreshold: 60 },
+      { level: 'red', advanceDays: 0, completionRateThreshold: 40 },
+    ],
+    enabled: true,
+  },
+  {
+    id: 'wr-cj',
+    projectId: 'p1',
+    type: 'chinese_journal_ratio',
+    name: '我国科技期刊比例预警',
+    levels: [
+      { level: 'yellow', advanceDays: 0, completionRateThreshold: 5 },
+      { level: 'orange', advanceDays: 0, completionRateThreshold: 10 },
+      { level: 'red', advanceDays: 0, completionRateThreshold: 20 },
+    ],
+    enabled: true,
+  },
 ];
 
 export const MOCK_CHINESE_JOURNAL_CONFIG: ChineseJournalConfig = {
-  id: 'cj1',
+  id: 'cj-1',
   projectId: 'p1',
-  totalRepresentativePapers: 32,
   minChineseJournalCount: 9,
   minChineseJournalRatio: 28,
-  assessAtProjectLevel: true,
   decomposeToTopics: true,
-  topicMinCounts: { t1: 1, t2: 2, t3: 2, t4: 3, t5: 1 },
-  journalListVersion: '2025版',
+  topicMinCounts: { t1: 2, t2: 2, t3: 2, t4: 2, t5: 1 },
   effectiveDate: '2025-01-01',
 };
 
-export const MOCK_JOURNALS: JournalEntry[] = [
-  { id: 'j1', name: '中国科学', issn: '1674-7216', publisher: '中国科学院', category: '综合', version: '2025版', addedAt: '2025-01-01' },
-  { id: 'j2', name: '科学通报', issn: '0023-074X', publisher: '中国科学院', category: '综合', version: '2025版', addedAt: '2025-01-01' },
-  { id: 'j3', name: '计算机学报', issn: '0254-4164', publisher: '中国计算机学会', category: '计算机', version: '2025版', addedAt: '2025-01-01' },
-  { id: 'j4', name: '软件学报', issn: '1000-9825', publisher: '中国科学院', category: '计算机', version: '2025版', addedAt: '2025-01-01' },
-  { id: 'j5', name: '通信学报', issn: '1000-436X', publisher: '中国通信学会', category: '通信', version: '2025版', addedAt: '2025-01-01' },
-];
-
-export const MOCK_VERSION_RECORDS: VersionRecord[] = [
-  { id: 'vr1', projectId: 'p1', version: 1, configId: 'i1', fieldName: 'plannedQuantity', beforeValue: '3', afterValue: '4', reason: '根据任务书调整', operator: '管理员A', operatedAt: '2025-02-15 10:30:00', effectiveDate: '2025-03-01' },
-  { id: 'vr2', projectId: 'p1', version: 1, configId: 'i1', fieldName: 'deadline', beforeValue: '2026-06-30', afterValue: '2026-12-31', reason: '项目延期', operator: '管理员A', operatedAt: '2025-02-15 10:32:00', effectiveDate: '2025-03-01' },
-  { id: 'vr3', projectId: 'p1', version: 2, configId: 'i3', fieldName: 'plannedQuantity', beforeValue: '5', afterValue: '6', reason: '补充指标', operator: '管理员B', operatedAt: '2025-06-10 14:00:00', effectiveDate: '2025-07-01' },
-];
-
-export const MOCK_WARNING_RULES: WarningRule[] = [
-  { id: 'wr1', projectId: 'p1', type: 'time', name: '时间预警', yellowThreshold: 90, orangeThreshold: 60, redThreshold: 30, enabled: true },
-  { id: 'wr2', projectId: 'p1', type: 'quantity_gap', name: '数量缺口预警', yellowThreshold: 30, orangeThreshold: 60, redThreshold: 90, enabled: true },
-  { id: 'wr3', projectId: 'p1', type: 'progress_insufficient', name: '进度不足预警', yellowThreshold: 50, orangeThreshold: 30, redThreshold: 10, enabled: true },
-  { id: 'wr4', projectId: 'p1', type: 'material', name: '佐证材料预警', yellowThreshold: 7, orangeThreshold: 14, redThreshold: 30, enabled: true },
-  { id: 'wr5', projectId: 'p1', type: 'chinese_journal_ratio', name: '我国科技期刊比例预警', yellowThreshold: 5, orangeThreshold: 10, redThreshold: 20, enabled: true },
-  { id: 'wr6', projectId: 'p1', type: 'undecomposed', name: '未分解指标预警', yellowThreshold: 0, orangeThreshold: 0, redThreshold: 0, enabled: true },
-];
-
-const createMaterials = (status: Material['status'][]): Material[] =>
-  status.map((s, idx) => ({
+const createMaterials = (statuses: AchievementMaterial['status'][]): AchievementMaterial[] =>
+  statuses.map((s, idx) => ({
     id: `m-${Math.random().toString(36).slice(2)}`,
     achievementId: '',
     name: `材料${idx + 1}`,
     status: s,
-    submittedAt: s !== '未提交' ? today : undefined,
-    reviewedAt: s === '审核通过' || s === '被退回' ? today : undefined,
+    submittedAt: s !== '未提交' ? '2025-06-15' : undefined,
+    reviewedAt: s === '审核通过' || s === '被退回' ? '2025-06-20' : undefined,
   }));
 
 export const MOCK_ACHIEVEMENTS: Achievement[] = [
-  // 课题1 论文
-  { id: 'a1', projectId: 'p1', topicId: 't1', achievementType: '论文', title: '面向国重项目的论文一', responsiblePerson: '张三', currentStage: '已录用', stageOrder: 3, totalStages: 4, status: '已录用', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: true, journalId: 'j1', registeredAt: '2025-03-01' },
-  { id: 'a2', projectId: 'p1', topicId: 't1', achievementType: '论文', title: '面向国重项目的论文二', responsiblePerson: '张三', currentStage: '审稿中', stageOrder: 2, totalStages: 4, status: '审稿中', materials: createMaterials(['未提交', '未提交']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-05-01' },
-  { id: 'a3', projectId: 'p1', topicId: 't1', achievementType: '论文', title: '面向国重项目的论文三', responsiblePerson: '李四', currentStage: '已发表', stageOrder: 4, totalStages: 4, status: '已发表', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: true, journalId: 'j2', registeredAt: '2025-04-01' },
-  // 课题1 专利
-  { id: 'a4', projectId: 'p1', topicId: 't1', achievementType: '专利', title: '发明专利一', responsiblePerson: '王五', currentStage: '交底书编制', stageOrder: 1, totalStages: 4, status: '交底书编制', materials: createMaterials(['未提交']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-02-01' },
-  { id: 'a5', projectId: 'p1', topicId: 't1', achievementType: '专利', title: '发明专利二', responsiblePerson: '王五', currentStage: '已受理', stageOrder: 2, totalStages: 4, status: '已受理', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-03-15' },
-  { id: 'a6', projectId: 'p1', topicId: 't1', achievementType: '专利', title: '发明专利三', responsiblePerson: '赵六', currentStage: '已受理', stageOrder: 2, totalStages: 4, status: '已受理', materials: createMaterials(['已提交', '审核中']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-04-15' },
-  { id: 'a7', projectId: 'p1', topicId: 't1', achievementType: '专利', title: '发明专利四', responsiblePerson: '王五', currentStage: '已授权', stageOrder: 4, totalStages: 4, status: '已授权', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-01-15' },
-  { id: 'a8', projectId: 'p1', topicId: 't1', achievementType: '专利', title: '发明专利五', responsiblePerson: '赵六', currentStage: '已受理', stageOrder: 2, totalStages: 4, status: '已受理', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-05-15' },
-  // 课题1 软著
-  { id: 'a9', projectId: 'p1', topicId: 't1', achievementType: '软件著作权', title: '软件一', responsiblePerson: '孙七', currentStage: '已取得证书', stageOrder: 3, totalStages: 3, status: '已取得证书', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-02-20' },
-  { id: 'a10', projectId: 'p1', topicId: 't1', achievementType: '软件著作权', title: '软件二', responsiblePerson: '孙七', currentStage: '已取得证书', stageOrder: 3, totalStages: 3, status: '已取得证书', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-04-20' },
-  { id: 'a11', projectId: 'p1', topicId: 't1', achievementType: '软件著作权', title: '软件三', responsiblePerson: '孙七', currentStage: '已取得证书', stageOrder: 3, totalStages: 3, status: '已取得证书', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-06-01' },
-  { id: 'a12', projectId: 'p1', topicId: 't1', achievementType: '软件著作权', title: '软件四', responsiblePerson: '孙七', currentStage: '申请中', stageOrder: 2, totalStages: 3, status: '申请中', materials: createMaterials(['已提交', '审核中']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-06-15' },
-  // 课题2 论文
-  { id: 'a13', projectId: 'p1', topicId: 't2', achievementType: '论文', title: '课题2论文一', responsiblePerson: '李四', currentStage: '已发表', stageOrder: 4, totalStages: 4, status: '已发表', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: true, journalId: 'j3', registeredAt: '2025-03-10' },
-  { id: 'a14', projectId: 'p1', topicId: 't2', achievementType: '论文', title: '课题2论文二', responsiblePerson: '李四', currentStage: '已录用', stageOrder: 3, totalStages: 4, status: '已录用', materials: createMaterials(['已提交', '被退回']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-05-10' },
-  // 课题3 论文
-  { id: 'a15', projectId: 'p1', topicId: 't3', achievementType: '论文', title: '课题3论文一', responsiblePerson: '王五', currentStage: '已发表', stageOrder: 4, totalStages: 4, status: '已发表', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-04-10' },
-  { id: 'a16', projectId: 'p1', topicId: 't3', achievementType: '论文', title: '课题3论文二', responsiblePerson: '王五', currentStage: '已录用', stageOrder: 3, totalStages: 4, status: '已录用', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: true, journalId: 'j4', registeredAt: '2025-05-20' },
-  { id: 'a17', projectId: 'p1', topicId: 't3', achievementType: '论文', title: '课题3论文三', responsiblePerson: '王五', currentStage: '审稿中', stageOrder: 2, totalStages: 4, status: '审稿中', materials: createMaterials(['未提交', '未提交']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-06-10' },
-  // 课题4 论文
-  { id: 'a18', projectId: 'p1', topicId: 't4', achievementType: '论文', title: '课题4论文一', responsiblePerson: '赵六', currentStage: '已发表', stageOrder: 4, totalStages: 4, status: '已发表', materials: createMaterials(['已提交', '审核通过']), officeRecognized: true, isDuplicate: false, isChineseJournal: true, journalId: 'j5', registeredAt: '2025-03-20' },
-  // 课题5 论文
-  { id: 'a19', projectId: 'p1', topicId: 't5', achievementType: '论文', title: '课题5论文一', responsiblePerson: '孙七', currentStage: '已录用', stageOrder: 3, totalStages: 4, status: '已录用', materials: createMaterials(['已提交', '审核中']), officeRecognized: false, isDuplicate: false, isChineseJournal: false, registeredAt: '2025-05-25' },
+  // 学术论文
+  {
+    id: 'ach-1',
+    projectId: 'p1',
+    topicId: 't1',
+    unitName: '清华大学',
+    achievementType: '学术论文',
+    title: '面向国重项目的架构设计方法研究',
+    responsiblePerson: '张三',
+    status: '审批通过',
+    createdAt: '2025-03-01',
+    updatedAt: '2025-06-20',
+    submittedAt: '2025-06-10',
+    remarks: '',
+    approvalOpinion: '符合要求，计入指标',
+    approvedAt: '2025-06-20',
+    approver: '管理员A',
+    countsToIndicator: true,
+    isRepresentative: true,
+    isChineseJournal: true,
+    chineseJournalReason: '发表在《中国科学》',
+    paperType: 'SCI',
+    journalName: '中国科学',
+    cnNumber: '11-5844/N',
+    issn: '1674-7216',
+    doi: '10.1360/SSP-2025-0001',
+    firstAuthor: '张三',
+    correspondingAuthor: '李四',
+    allAuthors: '张三, 李四, 王五',
+    submissionDate: '2025-01-10',
+    acceptanceDate: '2025-04-15',
+    publicationDate: '2025-06-01',
+    projectLabeling: '已标注项目编号',
+    materials: createMaterials(['已提交', '审核通过']),
+  },
+  {
+    id: 'ach-2',
+    projectId: 'p1',
+    topicId: 't1',
+    unitName: '北京大学',
+    achievementType: '学术论文',
+    title: '国重项目数据治理关键技术',
+    responsiblePerson: '赵六',
+    status: '审批中',
+    createdAt: '2025-04-10',
+    updatedAt: '2025-06-18',
+    submittedAt: '2025-06-18',
+    remarks: '',
+    countsToIndicator: false,
+    isRepresentative: true,
+    isChineseJournal: false,
+    paperType: 'EI',
+    journalName: '计算机研究与发展',
+    cnNumber: '11-1777/TP',
+    issn: '1000-1239',
+    firstAuthor: '赵六',
+    correspondingAuthor: '孙七',
+    allAuthors: '赵六, 孙七',
+    submissionDate: '2025-02-20',
+    acceptanceDate: '2025-05-10',
+    projectLabeling: '已标注',
+    materials: createMaterials(['已提交', '审核中']),
+  },
+  {
+    id: 'ach-3',
+    projectId: 'p1',
+    topicId: 't2',
+    unitName: '北京大学',
+    achievementType: '学术论文',
+    title: '基于深度学习的算法优化方法',
+    responsiblePerson: '王五',
+    status: '草稿',
+    createdAt: '2025-05-20',
+    updatedAt: '2025-05-20',
+    remarks: '正在撰写中',
+    countsToIndicator: false,
+    isRepresentative: false,
+    isChineseJournal: false,
+    paperType: 'SCI',
+    journalName: '',
+    firstAuthor: '王五',
+    correspondingAuthor: '王五',
+    allAuthors: '王五',
+    materials: createMaterials(['未提交', '未提交']),
+  },
+  {
+    id: 'ach-4',
+    projectId: 'p1',
+    topicId: 't4',
+    unitName: '浙江大学',
+    achievementType: '学术论文',
+    title: '示范应用场景下的系统集成研究',
+    responsiblePerson: '郑八',
+    status: '审批通过',
+    createdAt: '2025-03-15',
+    updatedAt: '2025-05-25',
+    submittedAt: '2025-05-15',
+    remarks: '',
+    approvalOpinion: '同意计入',
+    approvedAt: '2025-05-25',
+    approver: '管理员A',
+    countsToIndicator: true,
+    isRepresentative: true,
+    isChineseJournal: true,
+    chineseJournalReason: '《科学通报》',
+    paperType: '中文核心',
+    journalName: '科学通报',
+    cnNumber: '11-1784/N',
+    issn: '0023-074X',
+    firstAuthor: '郑八',
+    correspondingAuthor: '吴九',
+    allAuthors: '郑八, 吴九',
+    submissionDate: '2025-01-20',
+    acceptanceDate: '2025-03-30',
+    publicationDate: '2025-05-01',
+    projectLabeling: '已标注',
+    materials: createMaterials(['已提交', '审核通过']),
+  },
+  // 发明专利
+  {
+    id: 'ach-5',
+    projectId: 'p1',
+    topicId: 't1',
+    unitName: '清华大学',
+    achievementType: '发明专利',
+    title: '一种国重项目数据处理方法',
+    responsiblePerson: '张三',
+    status: '审批通过',
+    createdAt: '2025-02-10',
+    updatedAt: '2025-04-20',
+    submittedAt: '2025-04-10',
+    remarks: '',
+    approvalOpinion: '已授权，计入指标',
+    approvedAt: '2025-04-20',
+    approver: '管理员A',
+    countsToIndicator: true,
+    patentScope: '国内',
+    applicant: '清华大学',
+    inventors: '张三; 李四',
+    applicationNumber: '202510000001.0',
+    receiptNumber: '202510000001.0',
+    applicationDate: '2025-01-15',
+    receiptDate: '2025-02-01',
+    grantDate: '2025-04-10',
+    grantPublicationNumber: 'CN0000001B',
+    legalStatus: '授权',
+    materials: createMaterials(['已提交', '审核通过']),
+  },
+  {
+    id: 'ach-6',
+    projectId: 'p1',
+    topicId: 't2',
+    unitName: '清华大学',
+    achievementType: '发明专利',
+    title: '一种面向国重项目的算法加速装置',
+    responsiblePerson: '李四',
+    status: '已提交',
+    createdAt: '2025-04-05',
+    updatedAt: '2025-06-10',
+    submittedAt: '2025-06-10',
+    remarks: '',
+    countsToIndicator: false,
+    patentScope: '国内',
+    applicant: '清华大学',
+    inventors: '李四',
+    applicationNumber: '202510000002.9',
+    applicationDate: '2025-04-01',
+    legalStatus: '已提交申请',
+    materials: createMaterials(['已提交', '未提交']),
+  },
+  // 软件著作权
+  {
+    id: 'ach-7',
+    projectId: 'p1',
+    topicId: 't3',
+    unitName: '中科院计算所',
+    achievementType: '软件著作权',
+    title: '国重项目数据管理平台V1.0',
+    responsiblePerson: '王五',
+    status: '审批通过',
+    createdAt: '2025-02-20',
+    updatedAt: '2025-05-15',
+    submittedAt: '2025-05-10',
+    remarks: '',
+    approvalOpinion: '已取得证书，计入指标',
+    approvedAt: '2025-05-15',
+    approver: '管理员A',
+    countsToIndicator: true,
+    shortName: '数据管理平台',
+    version: 'V1.0',
+    copyrightOwner: '中科院计算所',
+    developers: '王五, 赵六',
+    completionDate: '2025-01-31',
+    registrationApplicationDate: '2025-02-15',
+    registrationNumber: '2025SR0000001',
+    certificateDate: '2025-05-01',
+    materials: createMaterials(['已提交', '审核通过']),
+  },
+  {
+    id: 'ach-8',
+    projectId: 'p1',
+    topicId: 't3',
+    unitName: '华中科技大学',
+    achievementType: '软件著作权',
+    title: '国重项目测试工具软件V1.0',
+    responsiblePerson: '孙七',
+    status: '退回修改',
+    createdAt: '2025-05-10',
+    updatedAt: '2025-06-12',
+    submittedAt: '2025-06-01',
+    remarks: '材料不完整',
+    countsToIndicator: false,
+    shortName: '测试工具',
+    version: 'V1.0',
+    copyrightOwner: '华中科技大学',
+    developers: '孙七',
+    completionDate: '2025-04-20',
+    registrationApplicationDate: '2025-05-15',
+    materials: createMaterials(['已提交', '被退回']),
+  },
+  // 标准规范
+  {
+    id: 'ach-9',
+    projectId: 'p1',
+    topicId: 't5',
+    unitName: '华中科技大学',
+    achievementType: '标准规范',
+    title: '国重项目数据交换接口技术要求',
+    responsiblePerson: '周十',
+    status: '审批通过',
+    createdAt: '2025-03-01',
+    updatedAt: '2025-06-05',
+    submittedAt: '2025-05-30',
+    remarks: '',
+    approvalOpinion: '已形成送审稿并提交，计入指标',
+    approvedAt: '2025-06-05',
+    approver: '管理员A',
+    countsToIndicator: true,
+    standardLevel: '团体标准',
+    leadingUnit: '华中科技大学',
+    participatingUnits: '北京大学, 中科院计算所',
+    drafters: '周十, 吴九',
+    responsibleOrganization: '某标准化技术委员会',
+    currentStage: '已提交送审',
+    draftSubmissionDate: '2025-04-15',
+    draftCommitDate: '2025-05-30',
+    materials: createMaterials(['已提交', '审核通过']),
+  },
+  // 人才培养
+  {
+    id: 'ach-10',
+    projectId: 'p1',
+    topicId: 't1',
+    unitName: '北京大学',
+    achievementType: '人才培养',
+    title: '面向国重项目的智能系统研究',
+    responsiblePerson: '钱十一',
+    status: '审批通过',
+    createdAt: '2025-01-10',
+    updatedAt: '2025-06-20',
+    submittedAt: '2025-06-15',
+    remarks: '',
+    approvalOpinion: '已取得学位授予证明，计入指标',
+    approvedAt: '2025-06-20',
+    approver: '管理员A',
+    countsToIndicator: true,
+    studentName: '钱十一',
+    educationLevel: '博士',
+    trainingUnit: '北京大学',
+    supervisorName: '李四',
+    thesisTitle: '面向国重项目的智能系统研究',
+    enrollmentDate: '2022-09-01',
+    expectedGraduationDate: '2026-06-30',
+    actualGraduationDate: '2025-06-15',
+    trainingStatus: '已取得证明材料',
+    materials: createMaterials(['已提交', '审核通过']),
+  },
 ];
 
-// 修复 achievementId 关联
 MOCK_ACHIEVEMENTS.forEach((a) => {
   a.materials.forEach((m) => {
     m.achievementId = a.id;
   });
 });
+
+export const MOCK_VERSION_RECORDS: VersionRecord[] = [
+  {
+    id: 'vr-1',
+    projectId: 'p1',
+    version: 1,
+    configId: 'ind-1',
+    fieldName: 'plannedQuantity',
+    beforeValue: '2',
+    afterValue: '3',
+    reason: '根据任务书调整',
+    operator: '管理员A',
+    operatedAt: '2025-02-15 10:30:00',
+    effectiveDate: '2025-03-01',
+  },
+  {
+    id: 'vr-2',
+    projectId: 'p1',
+    version: 2,
+    configId: 'ind-2',
+    fieldName: 'deadline',
+    beforeValue: '2026-12-31',
+    afterValue: '2027-06-30',
+    reason: '项目延期',
+    operator: '管理员A',
+    operatedAt: '2025-06-10 14:00:00',
+    effectiveDate: '2025-07-01',
+  },
+];
+
+export const MOCK_ARCHIVE_CATEGORIES: ArchiveCategory[] = [
+  { id: 'ac-1', projectId: 'p1', name: '项目申报与立项', description: '申报书、任务书、立项批复等', sortOrder: 1 },
+  { id: 'ac-2', projectId: 'p1', name: '年度/阶段报告', description: '年度报告、中期报告、结题报告', sortOrder: 2 },
+  { id: 'ac-3', projectId: 'p1', name: '科研成果材料', description: '论文、专利、软著、标准、人才证明', sortOrder: 3 },
+  { id: 'ac-4', projectId: 'p1', name: '会议与纪要', description: '项目会议、技术研讨会纪要', sortOrder: 4 },
+  { id: 'ac-5', projectId: 'p1', name: '检查验收材料', description: '中期检查、结题验收相关材料', sortOrder: 5 },
+  { id: 'ac-6', projectId: 'p1', name: '财务与合同', description: '合同、经费决算等材料', sortOrder: 6 },
+];
+
+export const MOCK_ARCHIVE_MATERIALS: ArchiveMaterial[] = [
+  {
+    id: 'am-1',
+    projectId: 'p1',
+    categoryId: 'ac-3',
+    name: '论文录用通知及全文',
+    fileName: 'paper_ach-1.pdf',
+    sourceAchievementId: 'ach-1',
+    uploader: '张三',
+    uploadedAt: '2025-06-21',
+    remarks: '关联成果 ach-1',
+  },
+  {
+    id: 'am-2',
+    projectId: 'p1',
+    categoryId: 'ac-3',
+    name: '发明专利授权证书',
+    fileName: 'patent_ach-5.pdf',
+    sourceAchievementId: 'ach-5',
+    uploader: '张三',
+    uploadedAt: '2025-04-21',
+    remarks: '关联成果 ach-5',
+  },
+  {
+    id: 'am-3',
+    projectId: 'p1',
+    categoryId: 'ac-5',
+    name: '中期检查汇报PPT',
+    fileName: 'midterm_report.pptx',
+    uploader: '管理员A',
+    uploadedAt: '2025-06-25',
+    remarks: '',
+  },
+  {
+    id: 'am-4',
+    projectId: 'p1',
+    categoryId: 'ac-1',
+    name: '项目任务书',
+    fileName: 'task_book.pdf',
+    uploader: '管理员A',
+    uploadedAt: '2025-01-05',
+    remarks: '',
+  },
+];

@@ -1,0 +1,65 @@
+import { Col, Form, Input, Row, Select } from 'antd';
+import { patentScopeOptions } from '../../utils/helpers';
+
+const { Option } = Select;
+
+export function PatentFields() {
+  return (
+    <Row gutter={16}>
+      <Col span={12}>
+        <Form.Item label="国内或国际" name="patentScope">
+          <Select placeholder="选择范围" allowClear>
+            {patentScopeOptions.map((s) => (
+              <Option key={s} value={s}>{s}</Option>
+            ))}
+          </Select>
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="申请人" name="applicant">
+          <Input />
+        </Form.Item>
+      </Col>
+      <Col span={24}>
+        <Form.Item label="发明人及排序" name="inventors">
+          <Input />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="申请号" name="applicationNumber">
+          <Input />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="受理号" name="receiptNumber">
+          <Input />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="申请时间" name="applicationDate">
+          <Input type="date" />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="受理时间" name="receiptDate">
+          <Input type="date" />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="授权时间" name="grantDate">
+          <Input type="date" />
+        </Form.Item>
+      </Col>
+      <Col span={12}>
+        <Form.Item label="授权公告号" name="grantPublicationNumber">
+          <Input />
+        </Form.Item>
+      </Col>
+      <Col span={24}>
+        <Form.Item label="当前法律状态" name="legalStatus">
+          <Input />
+        </Form.Item>
+      </Col>
+    </Row>
+  );
+}
