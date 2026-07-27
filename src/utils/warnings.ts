@@ -2,7 +2,6 @@ import dayjs from 'dayjs';
 import type {
   Achievement,
   AchievementType,
-  DomesticJournalConfig,
   IndicatorConfig,
   TimeNode,
   Topic,
@@ -52,9 +51,8 @@ export const generateWarnings = (
   indicators: IndicatorConfig[],
   achievements: Achievement[],
   nodes: TimeNode[],
-  domesticJournalConfig: DomesticJournalConfig,
-  warningRules: WarningRule[],
   topics: Topic[],
+  warningRules: WarningRule[],
   unitMap: Record<string, string>
 ): WarningResult[] => {
   const results: WarningResult[] = [];
@@ -192,23 +190,23 @@ export const generateWarnings = (
       }
     });
 
-  // 国内期刊比例预警
-  if (cjRule && domesticJournalConfig.enabled) {
-    const ratioData = calculateDomesticJournalRatio(achievements, domesticJournalConfig);
-    const level = ratioData.ratioGap !== null && ratioData.ratioGap > 0
-      ? getLevelByCompletionRate(ratioData.ratioGap, cjRule.levels)
-      : null;
+  // 国内期刊比例预警 — using topic.domesticJournalRequiredCount
+  if (cjRule) {
+    const ratioData = calculateDomesticJournalRatio(achievements, topics);
     const ratioText = ratioData.ratio !== null ? `${ratioData.ratio}%` : '暂无数据';
     const projectedText = ratioData.projectedRatio !== null ? `${ratioData.projectedRatio}%` : '暂无数据';
-    if (level || ratioData.gapCount > 0) {
+
+    if (ratioData.gapCount > 0) {
       results.push({
-        id: 'w-cj-ratio', type: 'chinese_journal_ratio', level: level || 'yellow', title: '国内期刊比例预警',
-        message: `当前比例 ${ratioText}，预计比例 ${projectedText}，最低要求 ${domesticJournalConfig.minRatio}%，缺口约 ${ratioData.gapCount} 篇`,
+        id: 'w-cj-ratio', type: 'chinese_journal_ratio', level: 'yellow', title: '国内期刊比例预警',
+        message: `当前比例 ${ratioText}，预计比例 ${projectedText}，最低要求 ${ratioData.minRequiredCount} 篇，缺口约 ${ratioData.gapCount} 篇`,
       });
     }
-    if (domesticJournalConfig.assessmentLevel === '项目及课题') {
-      topics.forEach((topic) => {
-        const required = domesticJournalConfig.topicMinCounts[topic.id] || 0;
+
+    // Per-topic domestic journal warnings
+    topics.forEach((topic) => {
+      const required = topic.domesticJournalRequiredCount || 0;
+      if (required > 0) {
         const actual = calculateTopicChineseJournalCount(topic.id, achievements);
         if (actual < required) {
           results.push({
@@ -217,8 +215,8 @@ export const generateWarnings = (
             topicId: topic.id, gap: required - actual,
           });
         }
-      });
-    }
+      }
+    });
   }
 
   return results;

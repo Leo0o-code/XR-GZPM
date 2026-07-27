@@ -1,7 +1,6 @@
 import dayjs from 'dayjs';
 import type { Achievement, ApprovalValidation, IndicatorConfig, TimeNode, Topic } from '../types';
 import { ACHIEVEMENT_EVIDENCE_RULES } from '../types';
-import { PROGRESS_ORDERS } from './helpers';
 
 export interface ValidationError {
   field?: string;
@@ -162,24 +161,57 @@ export const validateAchievementForApproval = (
     detail: hasValidIndicator ? undefined : '未关联有效指标',
   });
 
-  // 2. 成果进度是否达到认定状态（使用 PROGRESS_ORDERS 对比）
-  // Default required progress per achievement type
-  const defaultRequiredProgress: Record<string, string> = {
-    学术论文: '已录用',
-    发明专利: '已受理',
-    软件著作权: '已取得证书',
-    标准规范: '形成送审稿',
-    人才培养: '已取得证明材料',
-  };
-  const requiredProgress = defaultRequiredProgress[achievement.achievementType] || '';
-  const order = PROGRESS_ORDERS[achievement.achievementType] || [];
-  const currentIdx = order.indexOf(achievement.progressStatus);
-  const requiredIdx = order.indexOf(requiredProgress);
-  const progressMet = currentIdx >= requiredIdx;
+  // 2. 成果认定状态检查（基于认定类型）
+  let recognitionMet = true;
+  let recognitionDetail: string | undefined;
+  switch (achievement.achievementType) {
+    case '学术论文':
+      if (!achievement.paperRecognitionType) {
+        recognitionMet = false;
+        recognitionDetail = '未选择论文认定类型（录用/正式刊出）';
+      } else if (achievement.paperRecognitionType === '录用' && !achievement.acceptanceDate) {
+        recognitionMet = false;
+        recognitionDetail = '录用类型需填写录用日期';
+      } else if (achievement.paperRecognitionType === '正式刊出' && !achievement.publicationDate) {
+        recognitionMet = false;
+        recognitionDetail = '正式刊出类型需填写正式刊出日期';
+      }
+      break;
+    case '发明专利':
+      if (!achievement.patentRecognitionType) {
+        recognitionMet = false;
+        recognitionDetail = '未选择专利认定类型（受理/授权）';
+      } else if (achievement.patentRecognitionType === '受理' && !achievement.receiptDate) {
+        recognitionMet = false;
+        recognitionDetail = '受理类型需填写受理日期';
+      } else if (achievement.patentRecognitionType === '授权' && !achievement.grantDate) {
+        recognitionMet = false;
+        recognitionDetail = '授权类型需填写授权日期';
+      }
+      break;
+    case '软件著作权':
+      if (!achievement.certificateDate) {
+        recognitionMet = false;
+        recognitionDetail = '需填写证书日期';
+      }
+      break;
+    case '标准规范':
+      if (!achievement.draftCommitDate) {
+        recognitionMet = false;
+        recognitionDetail = '需填写送审提交日期';
+      }
+      break;
+    case '人才培养':
+      if (!achievement.actualGraduationDate && !achievement.defenseDate) {
+        recognitionMet = false;
+        recognitionDetail = '需填写实际毕业日期或论文答辩日期';
+      }
+      break;
+  }
   checks.push({
-    label: '成果进度达到认定状态',
-    passed: progressMet,
-    detail: progressMet ? undefined : `当前进度「${achievement.progressStatus}」未达到认定状态「${requiredProgress}」`,
+    label: '成果认定状态满足要求',
+    passed: recognitionMet,
+    detail: recognitionMet ? undefined : recognitionDetail,
   });
 
   // 3. recognizedCompletionDate 是否已填写

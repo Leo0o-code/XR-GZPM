@@ -6,11 +6,11 @@ import { calculateDomesticJournalRatio } from '../utils/stats';
 const { Title, Paragraph } = Typography;
 
 export function HomePage() {
-  const { project, topics, units, nodes, indicators, achievements, domesticJournalConfig, warningRules } = useAppStore();
+  const { project, topics, units, nodes, indicators, achievements, warningRules } = useAppStore();
 
   const unitMap = Object.fromEntries(units.map((u) => [u.id, u.name]));
-  const warnings = generateWarnings(indicators, achievements, nodes, domesticJournalConfig, warningRules, topics, unitMap);
-  const ratioData = calculateDomesticJournalRatio(achievements, domesticJournalConfig);
+  const warnings = generateWarnings(indicators, achievements, nodes, topics, warningRules, unitMap);
+  const ratioData = calculateDomesticJournalRatio(achievements, topics);
 
   const totalIndicators = indicators.length;
   const totalAchievements = achievements.length;
@@ -58,10 +58,10 @@ export function HomePage() {
           </Card>
         </Col>
         <Col span={12}>
-          <Card title="国内期刊论文比例">
+          <Card title="国内期刊论文情况">
             <Statistic
-              value={ratioData.ratio !== null ? `${ratioData.ratio}%` : '暂无数据'}
-              suffix={ratioData.ratio !== null ? `/ 目标 ${ratioData.minRequiredRatio}%` : ''}
+              value={ratioData.ratio !== null ? `${ratioData.chinese}/${ratioData.total}（${ratioData.ratio}%）` : '暂无数据'}
+              suffix={`要求 ≥ ${ratioData.minRequiredCount} 篇`}
             />
           </Card>
         </Col>

@@ -2,13 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
   Achievement, ArchiveCategory, ArchiveMaterial, ArchiveRequirement,
-  DomesticJournalConfig, IndicatorConfig, OperationRecord, Project,
-  ProjectUnit, TimeNode, Topic, WarningRule,
+  IndicatorConfig, OperationRecord, Project,
+  ProjectUnit, TimeNode, Topic, TopicIPRequirement,
+  TopicPowerGridRequirement, TopicNodeTarget, WarningRule,
 } from '../types';
 import {
   MOCK_ACHIEVEMENTS, MOCK_ARCHIVE_CATEGORIES, MOCK_ARCHIVE_MATERIALS, MOCK_ARCHIVE_REQUIREMENTS,
-  MOCK_CHINESE_JOURNAL_CONFIG, MOCK_INDICATORS, MOCK_OPERATION_RECORDS,
+  MOCK_INDICATORS, MOCK_OPERATION_RECORDS,
   MOCK_PROJECT, MOCK_TIME_NODES, MOCK_TOPICS, MOCK_UNITS, MOCK_WARNING_RULES,
+  MOCK_TOPIC_IP_REQUIREMENTS, MOCK_TOPIC_POWER_GRID_REQUIREMENTS, MOCK_TOPIC_NODE_TARGETS,
 } from '../data/mock';
 
 interface AppState {
@@ -17,7 +19,9 @@ interface AppState {
   topics: Topic[];
   nodes: TimeNode[];
   indicators: IndicatorConfig[];
-  domesticJournalConfig: DomesticJournalConfig;
+  topicIPRequirements: TopicIPRequirement[];
+  topicPowerGridRequirements: TopicPowerGridRequirement[];
+  topicNodeTargets: TopicNodeTarget[];
   warningRules: WarningRule[];
   achievements: Achievement[];
   archiveCategories: ArchiveCategory[];
@@ -42,12 +46,22 @@ interface AppState {
   removeIndicator: (id: string) => void;
   batchUpdateIndicators: (updates: { id: string; plannedQuantity: number }[]) => void;
 
-  updateDomesticJournalConfig: (updates: Partial<DomesticJournalConfig>) => void;
+  addIPRequirement: (req: TopicIPRequirement) => void;
+  updateIPRequirement: (topicId: string, updates: Partial<TopicIPRequirement>) => void;
+
+  addPowerGridReq: (req: TopicPowerGridRequirement) => void;
+  updatePowerGridReq: (id: string, updates: Partial<TopicPowerGridRequirement>) => void;
+  removePowerGridReq: (id: string) => void;
+
+  addNodeTarget: (target: TopicNodeTarget) => void;
+  updateNodeTarget: (id: string, updates: Partial<TopicNodeTarget>) => void;
+  removeNodeTarget: (id: string) => void;
 
   updateWarningRule: (id: string, updates: Partial<WarningRule>) => void;
 
   addAchievement: (achievement: Achievement) => void;
   updateAchievement: (id: string, updates: Partial<Achievement>) => void;
+  lockAchievement: (id: string) => void;
   submitAchievement: (id: string) => void;
   approveAchievement: (id: string, payload: Partial<Achievement>, approver: string) => void;
   rejectAchievement: (id: string, reason: string, approver: string) => void;
@@ -74,7 +88,9 @@ const buildInitialState = () => ({
   topics: MOCK_TOPICS,
   nodes: MOCK_TIME_NODES,
   indicators: MOCK_INDICATORS,
-  domesticJournalConfig: MOCK_CHINESE_JOURNAL_CONFIG,
+  topicIPRequirements: MOCK_TOPIC_IP_REQUIREMENTS,
+  topicPowerGridRequirements: MOCK_TOPIC_POWER_GRID_REQUIREMENTS,
+  topicNodeTargets: MOCK_TOPIC_NODE_TARGETS,
   warningRules: MOCK_WARNING_RULES,
   achievements: MOCK_ACHIEVEMENTS,
   archiveCategories: MOCK_ARCHIVE_CATEGORIES,
@@ -111,12 +127,32 @@ export const useAppStore = create<AppState>()(
         return { indicators: s.indicators.map((i) => map.has(i.id) ? { ...i, plannedQuantity: map.get(i.id)!, updatedAt: today } : i) };
       }),
 
-      updateDomesticJournalConfig: (updates) => set((s) => ({ domesticJournalConfig: { ...s.domesticJournalConfig, ...updates } })),
+      addIPRequirement: (req) => set((s) => ({ topicIPRequirements: [...s.topicIPRequirements, req] })),
+      updateIPRequirement: (topicId, updates) => set((s) => ({
+        topicIPRequirements: s.topicIPRequirements.map((r) => (r.topicId === topicId ? { ...r, ...updates } : r)),
+      })),
+
+      addPowerGridReq: (req) => set((s) => ({ topicPowerGridRequirements: [...s.topicPowerGridRequirements, req] })),
+      updatePowerGridReq: (id, updates) => set((s) => ({
+        topicPowerGridRequirements: s.topicPowerGridRequirements.map((r) => (r.id === id ? { ...r, ...updates } : r)),
+      })),
+      removePowerGridReq: (id) => set((s) => ({
+        topicPowerGridRequirements: s.topicPowerGridRequirements.filter((r) => r.id !== id),
+      })),
+
+      addNodeTarget: (target) => set((s) => ({ topicNodeTargets: [...s.topicNodeTargets, target] })),
+      updateNodeTarget: (id, updates) => set((s) => ({
+        topicNodeTargets: s.topicNodeTargets.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      })),
+      removeNodeTarget: (id) => set((s) => ({
+        topicNodeTargets: s.topicNodeTargets.filter((t) => t.id !== id),
+      })),
 
       updateWarningRule: (id, updates) => set((s) => ({ warningRules: s.warningRules.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
 
       addAchievement: (achievement) => set((s) => ({ achievements: [...s.achievements, achievement] })),
       updateAchievement: (id, updates) => set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, ...updates, updatedAt: new Date().toISOString().split('T')[0] } : a)) })),
+      lockAchievement: (id) => set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, status: '已提交' as const, submittedAt: new Date().toISOString().split('T')[0], updatedAt: new Date().toISOString().split('T')[0] } : a)) })),
       submitAchievement: (id) => set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, status: '已提交' as const, submittedAt: new Date().toISOString().split('T')[0], updatedAt: new Date().toISOString().split('T')[0] } : a)) })),
       approveAchievement: (id, payload, approver) => { const today = new Date().toISOString().split('T')[0]; set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, ...payload, status: '审批通过' as const, approver, approvedAt: today, updatedAt: today } : a)) })); },
       rejectAchievement: (id, reason, approver) => { const today = new Date().toISOString().split('T')[0]; set((s) => ({ achievements: s.achievements.map((a) => (a.id === id ? { ...a, status: '审批不通过' as const, approvalOpinion: reason, approver, approvedAt: today, updatedAt: today, countsToIndicator: false } : a)) })); },
@@ -136,6 +172,10 @@ export const useAppStore = create<AppState>()(
 
       resetToMock: () => set(buildInitialState()),
     }),
-    { name: 'research-achievement-storage-v4' }
+    { name: 'research-achievement-storage-v5' }
   )
 );
+
+export const canEditAchievement = (status: string): boolean => {
+  return status === '草稿' || status === '退回修改';
+};

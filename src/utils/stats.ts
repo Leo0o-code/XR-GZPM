@@ -3,7 +3,6 @@ import type {
   Achievement,
   AchievementType,
   CompletionStats,
-  DomesticJournalConfig,
   IndicatorConfig,
   TimeNode,
   Topic,
@@ -71,14 +70,12 @@ export interface DomesticJournalRatioResult {
   projectedChinese: number;
   projectedRatio: number | null;
   minRequiredCount: number;
-  minRequiredRatio: number;
   gapCount: number;
-  ratioGap: number | null;
 }
 
 export const calculateDomesticJournalRatio = (
   achievements: Achievement[],
-  config: DomesticJournalConfig
+  topics: Topic[]
 ): DomesticJournalRatioResult => {
   // Only count representative papers with status === '审批通过' && countsToIndicator
   const representative = achievements.filter(
@@ -103,16 +100,11 @@ export const calculateDomesticJournalRatio = (
   const projectedChinese = projectedRepresentative.filter((a) => a.isChineseJournal).length;
   const projectedRatio = projectedTotal > 0 ? (projectedChinese / projectedTotal) * 100 : null;
 
-  const minRequiredCount = config.minCount ?? 0;
-  const minRequiredRatio = config.minRatio;
+  // Total required across all topics
+  const minRequiredCount = topics.reduce((sum, t) => sum + (t.domesticJournalRequiredCount || 0), 0);
 
-  // For gap: ratioRequiredCount = Math.ceil(total * minRatio / 100); gapCount = Math.max(countGap, ratioGap)
-  const ratioRequiredCount = Math.ceil(total * minRequiredRatio / 100);
-  const countGap = Math.max(0, minRequiredCount - chinese);
-  const ratioGapCount = Math.max(0, ratioRequiredCount - chinese);
-  const gapCount = Math.max(countGap, ratioGapCount);
-
-  const ratioGap = ratio !== null ? Math.max(0, minRequiredRatio - ratio) : null;
+  // Gap: difference between required and actual
+  const gapCount = Math.max(0, minRequiredCount - chinese);
 
   return {
     total, chinese,
@@ -120,9 +112,7 @@ export const calculateDomesticJournalRatio = (
     projectedTotal, projectedChinese,
     projectedRatio: projectedRatio !== null ? Number(projectedRatio.toFixed(2)) : null,
     minRequiredCount,
-    minRequiredRatio,
     gapCount,
-    ratioGap: ratioGap !== null ? Number(ratioGap.toFixed(2)) : null,
   };
 };
 

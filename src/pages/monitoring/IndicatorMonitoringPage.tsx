@@ -30,7 +30,6 @@ export function IndicatorMonitoringPage() {
     nodes,
     indicators,
     achievements,
-    domesticJournalConfig,
     warningRules,
   } = useAppStore();
 
@@ -56,11 +55,11 @@ export function IndicatorMonitoringPage() {
   }, [indicators, achievements, nodes, view, topics, filter]);
 
   const warnings = useMemo(
-    () => generateWarnings(indicators, achievements, nodes, domesticJournalConfig, warningRules, topics, unitMap),
-    [indicators, achievements, nodes, domesticJournalConfig, warningRules, topics, unitMap]
+    () => generateWarnings(indicators, achievements, nodes, topics, warningRules, unitMap),
+    [indicators, achievements, nodes, topics, warningRules, unitMap]
   );
 
-  const ratioData = calculateDomesticJournalRatio(achievements, domesticJournalConfig);
+  const ratioData = calculateDomesticJournalRatio(achievements, topics);
 
   const filteredWarnings = useMemo(
     () =>
@@ -183,14 +182,20 @@ export function IndicatorMonitoringPage() {
       <Card title="国内期刊论文监控" style={{ marginBottom: 16 }}>
         <Space size="large">
           <div>
-            <Title level={5}>当前比例</Title>
+            <Title level={5}>当前数量</Title>
             <Tag
               color={
-                ratioData.ratio !== null && ratioData.ratio >= ratioData.minRequiredRatio
+                ratioData.chinese >= ratioData.minRequiredCount
                   ? 'success'
                   : 'warning'
               }
             >
+              {ratioData.chinese} / {ratioData.total} 篇
+            </Tag>
+          </div>
+          <div>
+            <Title level={5}>当前比例</Title>
+            <Tag>
               {ratioData.ratio !== null ? `${ratioData.ratio}%` : '暂无数据'}
             </Tag>
           </div>
@@ -203,7 +208,7 @@ export function IndicatorMonitoringPage() {
           <div>
             <Title level={5}>最低要求</Title>
             <Tag>
-              {ratioData.minRequiredRatio}% / {ratioData.minRequiredCount} 篇
+              {ratioData.minRequiredCount} 篇
             </Tag>
           </div>
           <div>

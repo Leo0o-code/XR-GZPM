@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { calculateCompletionStats, calculateDomesticJournalRatio, isRecognized } from './stats';
 import { generateWarnings } from './warnings';
 import { validateEvidenceMaterials, checkDuplicateAchievement } from './validation';
-import { isProgressMet } from './helpers';
-import type { Achievement, AchievementMaterial, DomesticJournalConfig, IndicatorConfig, TimeNode, WarningRule } from '../types';
+import type { Achievement, AchievementMaterial, IndicatorConfig, TimeNode, Topic, WarningRule } from '../types';
 
 const makeNode = (id: string, deadline: string): TimeNode =>
   ({ id, projectId: 'p1', name: id, deadline, description: '', participatesInWarning: true, sortOrder: 1 } as TimeNode);
@@ -71,20 +70,6 @@ describe('累计节点统计', () => {
   });
 });
 
-describe('进度等级判定', () => {
-  it('已刊出 >= 已录用', () => {
-    expect(isProgressMet('学术论文', '已刊出', '已录用')).toBe(true);
-  });
-
-  it('审稿中 < 已录用', () => {
-    expect(isProgressMet('学术论文', '审稿中', '已录用')).toBe(false);
-  });
-
-  it('已授权 >= 已受理', () => {
-    expect(isProgressMet('发明专利', '已授权', '已受理')).toBe(true);
-  });
-});
-
 describe('佐证材料 OR 规则', () => {
   it('论文有录用通知即满足（OR规则）', () => {
     const ach = makeAchievement({ achievementType: '学术论文', materials: [makeMaterial({ materialType: '论文录用通知', status: '审核通过' })] });
@@ -122,30 +107,37 @@ describe('重复成果检测', () => {
 });
 
 describe('国内期刊比例', () => {
-  it('20篇代表性论文中2篇国内期刊，最低20%应缺2篇', () => {
-    const config: DomesticJournalConfig = { id: 'cj', projectId: 'p1', enabled: true, statisticsScope: '代表性论文', assessmentLevel: '项目总体', minRatio: 20, minCount: 4, topicMinCounts: {} };
+  it('使用课题 domesticJournalRequiredCount 计算国内期刊要求', () => {
+    const topics: Topic[] = [
+      { id: 't1', projectId: 'p1', code: 'K1', name: '课题1', leadingUnitId: 'u1', participatingUnitIds: [], domesticJournalRequiredCount: 4, topicOverallRequirements: {} },
+    ];
     const achievements = Array.from({ length: 20 }, (_, i) =>
       makeAchievement({ id: `a-${i}`, achievementType: '学术论文', isRepresentative: true, isChineseJournal: i < 2, doi: `10.${i}` })
     );
-    const result = calculateDomesticJournalRatio(achievements, config);
+    const result = calculateDomesticJournalRatio(achievements, topics);
     expect(result.total).toBe(20);
     expect(result.chinese).toBe(2);
+    expect(result.minRequiredCount).toBe(4);
     expect(result.gapCount).toBe(2);
     expect(result.ratio).toBe(10);
   });
 
   it('无代表性论文时比率为null', () => {
-    const config: DomesticJournalConfig = { id: 'cj', projectId: 'p1', enabled: true, statisticsScope: '代表性论文', assessmentLevel: '项目总体', minRatio: 20, topicMinCounts: {} };
-    const result = calculateDomesticJournalRatio([], config);
+    const topics: Topic[] = [
+      { id: 't1', projectId: 'p1', code: 'K1', name: '课题1', leadingUnitId: 'u1', participatingUnitIds: [], domesticJournalRequiredCount: 4, topicOverallRequirements: {} },
+    ];
+    const result = calculateDomesticJournalRatio([], topics);
     expect(result.ratio).toBeNull();
   });
 });
 
 describe('预警生成', () => {
   it('generateWarnings 不崩溃', () => {
-    const config: DomesticJournalConfig = { id: 'cj', projectId: 'p1', enabled: true, statisticsScope: '代表性论文', assessmentLevel: '项目总体', minRatio: 20, topicMinCounts: {} };
+    const topics: Topic[] = [
+      { id: 't1', projectId: 'p1', code: 'K1', name: '课题1', leadingUnitId: 'u1', participatingUnitIds: [], domesticJournalRequiredCount: 4, topicOverallRequirements: {} },
+    ];
     const warnings = generateWarnings(
-      [], [], [], config, makeWarningRules(), [], {}
+      [], [], [], topics, makeWarningRules(), {}
     );
     expect(Array.isArray(warnings)).toBe(true);
   });

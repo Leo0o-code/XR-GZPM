@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   DatePicker,
+  Drawer,
   Form,
   Input,
   InputNumber,
@@ -21,14 +22,13 @@ import dayjs from 'dayjs';
 import {
   DeleteOutlined,
   EditOutlined,
-  HistoryOutlined,
   PlusOutlined,
   TableOutlined,
   DownloadOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useAppStore } from '../../store';
 import {
-  ACHIEVEMENT_EVIDENCE_RULES,
   ACHIEVEMENT_TYPES,
   type AchievementType,
   type IndicatorConfig,
@@ -37,10 +37,13 @@ import {
 } from '../../types';
 import { exportToExcel } from '../../utils/export';
 
-const { TabPane } = Tabs;
 const { Option } = Select;
 const { TextArea } = Input;
 const { Text } = Typography;
+
+const POWER_GRID_TYPES: Array<'学术论文' | '发明专利' | '软件著作权' | '标准规范'> = [
+  '学术论文', '发明专利', '软件著作权', '标准规范',
+];
 
 export function IndicatorConfigPage() {
   const {
@@ -49,8 +52,8 @@ export function IndicatorConfigPage() {
     units,
     nodes,
     indicators,
-    domesticJournalConfig,
-    operationRecords,
+    topicPowerGridRequirements,
+    topicNodeTargets,
     addNode,
     updateNode,
     removeNode,
@@ -58,31 +61,24 @@ export function IndicatorConfigPage() {
     removeIndicator,
     batchUpdateIndicators,
     updateTopic,
-    updateDomesticJournalConfig,
+    addPowerGridReq,
+    updatePowerGridReq,
     addOperationRecord,
   } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState('topics-indicators');
+  const [activeTab, setActiveTab] = useState('topic-config');
   const [nodeFormVisible, setNodeFormVisible] = useState(false);
   const [editingNode, setEditingNode] = useState<TimeNode | null>(null);
   const [selectedTopicId, setSelectedTopicId] = useState<string>('');
   const [selectedNodeId, setSelectedNodeId] = useState<string>('');
 
-  const [nodeForm] = Form.useForm();
-  const [cjForm] = Form.useForm();
-  const [topicForm] = Form.useForm();
+  // Drawer state for topic editing
+  const [topicDrawerOpen, setTopicDrawerOpen] = useState(false);
+  const [editingTopicId, setEditingTopicId] = useState<string>('');
 
-  // Topic edit modal
-  const [topicEditVisible, setTopicEditVisible] = useState(false);
-  const [editingTopic, setEditingTopic] = useState<Topic | null>(null);
+  const [nodeForm] = Form.useForm();
 
   // Operation record filters
-  const [opFilter, setOpFilter] = useState({
-    module: '',
-    operationType: '',
-    keyword: '',
-  });
-
   // Maps
   const topicMap = Object.fromEntries(topics.map((t) => [t.id, t]));
   const nodeMap = Object.fromEntries(nodes.map((n) => [n.id, n]));
@@ -154,7 +150,116 @@ export function IndicatorConfigPage() {
     setNodeFormVisible(true);
   };
 
-  // ---- Topic detail / indicator matrix ----
+  // ---- Topic Drawer handlers ----
+  const openTopicDrawer = (topicId: string) => {
+    setEditingTopicId(topicId);
+    setTopicDrawerOpen(true);
+  };
+
+  const closeTopicDrawer = () => {
+    setTopicDrawerOpen(false);
+    setEditingTopicId('');
+  };
+
+  const editingTopic = editingTopicId ? topicMap[editingTopicId] : null;
+  const editingPowerGridReqs = editingTopicId
+    ? topicPowerGridRequirements.filter((r) => r.topicId === editingTopicId)
+    : [];
+
+  // Topic save handlers
+  const handleSaveTopicBasic = (values: any, topic: Topic) => {
+    updateTopic(topic.id, {
+      code: values.code, name: values.name,
+      principalName: values.principalName || '',
+      contactName: values.contactName || '',
+      contactPhone: values.contactPhone || '',
+      contactEmail: values.contactEmail || '',
+      financeAssistant: values.financeAssistant || '',
+      financeAssistantEmail: values.financeAssistantEmail || '',
+      financeAssistantPhone: values.financeAssistantPhone || '',
+      remarks: values.remarks || '',
+    });
+    addOperationRecord({
+      id: `or-${Date.now()}`,
+      projectId: project.id,
+      module: '课题配置',
+      operationType: '修改',
+      objectType: '课题',
+      objectId: topic.id,
+      objectName: values.name,
+      description: `修改课题基本信息：${values.name}`,
+      operator: '当前用户',
+      operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    });
+    message.success('基本信息更新成功');
+  };
+
+  const handleSaveTopicUnits = (values: any, topic: Topic) => {
+    const participatingUnitIds = values.participatingUnits
+      ? values.participatingUnits.split(/[,，、\n]/).map((s: string) => s.trim()).filter(Boolean)
+      : [];
+    updateTopic(topic.id, {
+      leadingUnitId: values.leadingUnit,
+      participatingUnitIds,
+    });
+    addOperationRecord({
+      id: `or-${Date.now()}`, projectId: project.id, module: '课题配置', operationType: '修改',
+      objectType: '课题', objectId: topic.id, objectName: topic.name,
+      description: `修改课题参与单位：${topic.name}`, operator: '当前用户',
+      operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    });
+    message.success('参与单位更新成功');
+  };
+
+  const handleSaveTopicReq = (values: any, topic: Topic) => {
+    const overallReqs: Record<string, number> = {};
+    ACHIEVEMENT_TYPES.forEach((type) => {
+      overallReqs[type] = values[`req_${type}`] ?? 0;
+    });
+    updateTopic(topic.id, {
+      domesticJournalRequiredCount: values.domesticJournalRequiredCount ?? 0,
+      topicOverallRequirements: overallReqs,
+    });
+    addOperationRecord({
+      id: `or-${Date.now()}`, projectId: project.id, module: '课题配置', operationType: '修改',
+      objectType: '课题', objectId: topic.id, objectName: topic.name,
+      description: `修改课题成果要求：${topic.name}`, operator: '当前用户',
+      operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    });
+    message.success('成果要求更新成功');
+  };
+
+  const handleSavePowerGridReqs = (valuesArray: { achievementType: string; requiredCount: number }[], topic: Topic) => {
+    valuesArray.forEach((val) => {
+      const existing = editingPowerGridReqs.find((r) => r.achievementType === val.achievementType);
+      if (existing) {
+        updatePowerGridReq(existing.id, { requiredCount: val.requiredCount });
+      } else if (val.requiredCount > 0) {
+        addPowerGridReq({
+          id: `pgr-${Date.now()}-${val.achievementType}`,
+          projectId: project.id,
+          topicId: topic.id,
+          achievementType: val.achievementType as '学术论文' | '发明专利' | '软件著作权' | '标准规范',
+          requiredCount: val.requiredCount,
+        });
+      }
+    });
+    addOperationRecord({
+      id: `or-${Date.now()}`,
+      projectId: project.id,
+      module: '课题配置',
+      operationType: '修改',
+      objectType: '课题',
+      objectId: topic.id,
+      objectName: topic.name,
+      description: `修改电网公司主导成果要求：${topic.name}`,
+      operator: '当前用户',
+      operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    });
+    message.success('电网公司成果要求更新成功');
+  };
+
+  // ---- Tab 3: 指标分解 ----
   const selectedTopic = selectedTopicId ? topicMap[selectedTopicId] : null;
   const selectedNode = selectedNodeId ? nodeMap[selectedNodeId] : null;
 
@@ -168,9 +273,23 @@ export function IndicatorConfigPage() {
     ? indicators.filter((i) => i.topicId === selectedTopicId)
     : [];
 
+  // Node targets for selected topic + node
+  const currentNodeTargets = selectedTopicId && selectedNodeId
+    ? topicNodeTargets.filter((t) => t.topicId === selectedTopicId && t.nodeId === selectedNodeId)
+    : [];
+
   // Build matrix: rows = units, columns = achievement types
+  const SEP = '::';
+  const [matrixEdits, setMatrixEdits] = useState<Record<string, number>>({});
+
+  const makeKey = (unitId: string, type: string) => `${unitId}${SEP}${type}`;
+  const parseKey = (key: string) => {
+    const idx = key.indexOf(SEP);
+    return { unitId: key.substring(0, idx), type: key.substring(idx + SEP.length) };
+  };
+
   const matrixData = useMemo(() => {
-    if (!selectedTopic || !selectedNodeId) return { rows: [], totals: {} as Record<string, number>, topicRequired: {} as Record<string, number> };
+    if (!selectedTopic || !selectedNodeId) return { rows: [] as { unitId: string; unitName: string; cells: Record<string, IndicatorConfig | undefined> }[], totals: {} as Record<string, number> };
 
     const rows = topicUnitIds.map((unitId) => {
       const cells: Record<string, IndicatorConfig | undefined> = {};
@@ -182,32 +301,17 @@ export function IndicatorConfigPage() {
       return { unitId, unitName: unitMap[unitId] || unitId, cells };
     });
 
-    // Calculate totals and topic requirements
     const totals: Record<string, number> = {};
-    const topicRequired: Record<string, number> = {};
     ACHIEVEMENT_TYPES.forEach((type) => {
-      totals[type] = rows.reduce((sum, row) => sum + (row.cells[type]?.plannedQuantity || 0), 0);
-      // Find all indicators for this topic+type+node across all units to get total
-      const allForType = topicIndicators.filter(
-        (i) => i.achievementType === type && i.nodeId === selectedNodeId
-      );
-      // topic required = sum of all unit contributions
-      topicRequired[type] = allForType.reduce((sum, i) => sum + i.plannedQuantity, 0);
+      totals[type] = rows.reduce((sum, row) => {
+        const editKey = makeKey(row.unitId, type);
+        if (editKey in matrixEdits) return sum + matrixEdits[editKey];
+        return sum + (row.cells[type]?.plannedQuantity || 0);
+      }, 0);
     });
 
-    return { rows, totals, topicRequired };
-  }, [selectedTopic, selectedNodeId, topicIndicators, topicUnitIds, unitMap]);
-
-  // Handle batch save for matrix edits
-  // Use :: as separator to avoid conflicts with hyphens in unitIds
-  const SEP = '::';
-  const [matrixEdits, setMatrixEdits] = useState<Record<string, number>>({});
-
-  const makeKey = (unitId: string, type: string) => `${unitId}${SEP}${type}`;
-  const parseKey = (key: string) => {
-    const idx = key.indexOf(SEP);
-    return { unitId: key.substring(0, idx), type: key.substring(idx + SEP.length) };
-  };
+    return { rows, totals };
+  }, [selectedTopic, selectedNodeId, topicIndicators, topicUnitIds, unitMap, matrixEdits]);
 
   const handleMatrixCellChange = (unitId: string, type: string, value: number | null) => {
     setMatrixEdits((prev) => ({ ...prev, [makeKey(unitId, type)]: value ?? 0 }));
@@ -266,7 +370,7 @@ export function IndicatorConfigPage() {
     addOperationRecord({
       id: `or-${Date.now()}`,
       projectId: project.id,
-      module: '课题及指标配置',
+      module: '指标分解',
       operationType: '批量修改',
       objectType: '科研指标',
       objectName: `${selectedTopic?.name} ${selectedNode?.name}`,
@@ -279,111 +383,7 @@ export function IndicatorConfigPage() {
     message.success('批量保存成功');
   };
 
-  // ---- Topic edit handlers ----
-  const openTopicEdit = (topic: Topic) => {
-    setEditingTopic(topic);
-    topicForm.setFieldsValue({
-      code: topic.code,
-      name: topic.name,
-      leadingUnitId: topic.leadingUnitId,
-      participatingUnitIds: topic.participatingUnitIds.join(', '),
-      remarks: topic.remarks || '',
-    });
-    setTopicEditVisible(true);
-  };
-
-  const handleSaveTopic = (values: any) => {
-    if (!editingTopic) return;
-    const unitIds: string[] = values.participatingUnitIds
-      ? values.participatingUnitIds.split(/[,，\n]/).map((s: string) => s.trim()).filter(Boolean)
-      : [];
-    updateTopic(editingTopic.id, {
-      code: values.code,
-      name: values.name,
-      leadingUnitId: values.leadingUnitId,
-      participatingUnitIds: unitIds,
-      remarks: values.remarks || '',
-    });
-    addOperationRecord({
-      id: `or-${Date.now()}`,
-      projectId: project.id,
-      module: '课题及指标配置',
-      operationType: '修改',
-      objectType: '课题',
-      objectId: editingTopic.id,
-      objectName: values.name,
-      description: `修改课题信息：${values.name}`,
-      operator: '当前用户',
-      operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    });
-    setTopicEditVisible(false);
-    setEditingTopic(null);
-    topicForm.resetFields();
-    message.success('课题信息更新成功');
-  };
-
-  // ---- DomesticJournalConfig handlers ----
-  const handleSaveCJ = () => {
-    const values = cjForm.getFieldsValue();
-    const topicMinCounts: Record<string, number> = {};
-    if (values.decomposeToTopics) {
-      topics.forEach((t) => {
-        const fieldKey = `topicMin_${t.id}`;
-        const val = cjForm.getFieldValue(fieldKey);
-        if (val !== undefined && val !== null) {
-          topicMinCounts[t.id] = val;
-        }
-      });
-    }
-    updateDomesticJournalConfig({
-      enabled: values.enabled,
-      statisticsScope: values.statisticsScope || '代表性论文',
-      assessmentLevel: values.assessmentLevel || '项目总体',
-      minRatio: values.minRatio ?? 20,
-      minCount: values.minCount ?? 0,
-      topicMinCounts,
-      remarks: values.remarks || '',
-    });
-    addOperationRecord({
-      id: `or-${Date.now()}`,
-      projectId: project.id,
-      module: '国内期刊指标配置',
-      operationType: '修改',
-      objectType: '国内期刊配置',
-      objectName: '国内期刊指标配置',
-      description: '修改国内期刊指标配置',
-      operator: '当前用户',
-      operatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    });
-    message.success('保存国内期刊配置成功');
-  };
-
-  // Load CJ config into form
-  const initCJForm = () => {
-    cjForm.setFieldsValue({
-      enabled: domesticJournalConfig.enabled,
-      statisticsScope: domesticJournalConfig.statisticsScope,
-      assessmentLevel: domesticJournalConfig.assessmentLevel,
-      minRatio: domesticJournalConfig.minRatio,
-      minCount: domesticJournalConfig.minCount ?? 0,
-      decomposeToTopics: domesticJournalConfig.assessmentLevel === '项目及课题',
-      remarks: domesticJournalConfig.remarks,
-    });
-    Object.entries(domesticJournalConfig.topicMinCounts).forEach(([tid, val]) => {
-      cjForm.setFieldsValue({ [`topicMin_${tid}`]: val });
-    });
-  };
-
-  const handleTabChange = (key: string) => {
-    setActiveTab(key);
-    if (key === 'domesticJournal') {
-      initCJForm();
-    }
-  };
-
-  const decomposeToTopics = Form.useWatch('decomposeToTopics', cjForm);
-
-  // ---- Node table columns ----
+  // ---- Node table columns (Tab 2) ----
   const nodeColumns = [
     { title: '排序', dataIndex: 'sortOrder', key: 'sortOrder', width: 70 },
     { title: '节点名称', dataIndex: 'name', key: 'name' },
@@ -419,218 +419,129 @@ export function IndicatorConfigPage() {
     },
   ];
 
-  // ---- OperationRecord table columns ----
-  const filteredOps = operationRecords.filter((r) => {
-    return (
-      (!opFilter.module || r.module === opFilter.module) &&
-      (!opFilter.operationType || r.operationType === opFilter.operationType) &&
-      (!opFilter.keyword || r.objectName.includes(opFilter.keyword) || r.description.includes(opFilter.keyword))
-    );
-  });
-
-  const opColumns = [
-    { title: '模块', dataIndex: 'module', key: 'module' },
-    { title: '操作类型', dataIndex: 'operationType', key: 'operationType' },
-    { title: '对象', dataIndex: 'objectName', key: 'objectName' },
-    { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
-    { title: '操作人', dataIndex: 'operator', key: 'operator' },
-    { title: '操作时间', dataIndex: 'operatedAt', key: 'operatedAt' },
-  ];
-
-  // ---- Topic card render helpers ----
-  const getTopicSummary = (topicId: string, nodeId: string) => {
-    const topicInds = indicators.filter((i) => i.topicId === topicId && i.nodeId === nodeId);
-    if (topicInds.length === 0) return '未配置';
-    const total = topicInds.reduce((sum, i) => sum + i.plannedQuantity, 0);
-    const types = [...new Set(topicInds.map((i) => i.achievementType))];
-    return `${types.length} 类 / ${total} 项`;
+  // ---- Topic card summary helpers ----
+  const getTopicIPSummary = (topicId: string) => {
+    const topic = topicMap[topicId];
+    if (!topic?.topicOverallRequirements) return '未配置';
+    const reqs = topic.topicOverallRequirements;
+    const total = Object.values(reqs).reduce((sum: number, v: number) => sum + v, 0);
+    return total > 0 ? `${total} 项` : '未配置';
   };
+
+  const getTopicPowerGridSummary = (topicId: string) => {
+    const reqs = topicPowerGridRequirements.filter((r) => r.topicId === topicId);
+    if (reqs.length === 0) return '未配置';
+    const total = reqs.reduce((sum, r) => sum + r.requiredCount, 0);
+    return `${reqs.length} 类 / ${total} 项`;
+  };
+
+  // ---- Tab contents ----
+  const renderTopicConfigTab = () => (
+    <div>
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        {topics.map((topic) => (
+          <Card
+            key={topic.id}
+            size="small"
+            hoverable
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Space>
+                    <Tag color="blue">{topic.code}</Tag>
+                    <Text strong style={{ fontSize: 16 }}>{topic.name}</Text>
+                  </Space>
+                  <Space size="large" wrap>
+                    <Text type="secondary">
+                      牵头单位：{unitMap[topic.leadingUnitId] || topic.leadingUnitId || '-'}
+                    </Text>
+                    <Text type="secondary">
+                      参与单位：{topic.participatingUnitIds.length} 个
+                    </Text>
+                    <Text type="secondary">
+                      知识产权：{getTopicIPSummary(topic.id)}
+                    </Text>
+                    <Text type="secondary">
+                      国内期刊要求：{topic.domesticJournalRequiredCount || 0} 篇
+                    </Text>
+                    <Text type="secondary">
+                      电网主导：{getTopicPowerGridSummary(topic.id)}
+                    </Text>
+                  </Space>
+                </Space>
+              </div>
+              <Button
+                type="primary"
+                icon={<SettingOutlined />}
+                onClick={() => openTopicDrawer(topic.id)}
+              >
+                编辑配置
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </Space>
+
+      {/* Topic Edit Drawer */}
+      <Drawer
+        title={editingTopic ? `${editingTopic.code} ${editingTopic.name} - 课题配置` : '课题配置'}
+        open={topicDrawerOpen}
+        onClose={closeTopicDrawer}
+        width={720}
+        destroyOnClose
+      >
+        {editingTopic && (
+          <Space direction="vertical" style={{ width: '100%' }} size="large">
+            {/* Section 1: 基本信息 */}
+            <Card title="基本信息" size="small">
+              <Section1BasicInfo
+                topic={editingTopic}
+                onSave={(values) => handleSaveTopicBasic(values, editingTopic)}
+              />
+            </Card>
+
+            {/* Section 2: 参与单位 */}
+            <Card title="参与单位" size="small">
+              <Section2Units
+                topic={editingTopic}
+                onSave={(values) => handleSaveTopicUnits(values, editingTopic)}
+              />
+            </Card>
+
+            {/* Section 3: 课题总体成果要求 */}
+            <Card title="课题总体成果要求" size="small">
+              <Section3TopicReq
+                topic={editingTopic}
+                onSave={(values) => handleSaveTopicReq(values, editingTopic)}
+              />
+            </Card>
+
+            {/* Section 4: 电网公司主导成果要求 */}
+            <Card title="电网公司主导成果要求" size="small">
+              <Section4PowerGrid
+                topic={editingTopic}
+                powerGridReqs={editingPowerGridReqs}
+                onSave={(values) => handleSavePowerGridReqs(values, editingTopic)}
+              />
+            </Card>
+          </Space>
+        )}
+      </Drawer>
+    </div>
+  );
 
   return (
     <div>
-      <Tabs activeKey={activeTab} onChange={handleTabChange}>
-        {/* Tab 1: 课题及指标配置 */}
-        <TabPane
-          tab={<span><TableOutlined /> 课题及指标配置</span>}
-          key="topics-indicators"
+      <Tabs activeKey={activeTab} onChange={setActiveTab}>
+        <Tabs.TabPane
+          tab={<span><SettingOutlined /> 课题配置</span>}
+          key="topic-config"
         >
-          {!selectedTopicId ? (
-            <Card title="课题列表">
-              <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                {topics.map((topic) => (
-                  <Card
-                    key={topic.id}
-                    size="small"
-                    hoverable
-                    onClick={() => {
-                      setSelectedTopicId(topic.id);
-                      if (sortedNodes.length > 0) {
-                        setSelectedNodeId(sortedNodes[0].id);
-                      }
-                    }}
-                  >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                      <Space>
-                        <Tag color="blue">{topic.code}</Tag>
-                        <Text strong>{topic.name}</Text>
-                      </Space>
-                      <Space size="large">
-                        <Text type="secondary">
-                          牵头单位：{unitMap[topic.leadingUnitId] || topic.leadingUnitId || '-'}
-                        </Text>
-                        <Text type="secondary">
-                          参与单位：{topic.participatingUnitIds.length} 个
-                        </Text>
-                        <Text type="secondary">
-                          中期：{getTopicSummary(topic.id, sortedNodes.find((n) => n.name.includes('中期'))?.id || sortedNodes[2]?.id || '')}
-                        </Text>
-                        <Text type="secondary">
-                          结项：{getTopicSummary(topic.id, sortedNodes[sortedNodes.length - 1]?.id || '')}
-                        </Text>
-                        <Button type="link" size="small">进入配置</Button>
-                      </Space>
-                    </Space>
-                  </Card>
-                ))}
-              </Space>
-            </Card>
-          ) : (
-            <div>
-              {/* Back button + topic info */}
-              <Card size="small" style={{ marginBottom: 16 }}>
-                <Space>
-                  <Button onClick={() => { setSelectedTopicId(''); setSelectedNodeId(''); }}>
-                    返回课题列表
-                  </Button>
-                  <Text strong style={{ fontSize: 16 }}>{selectedTopic?.code} {selectedTopic?.name}</Text>
-                  <Button
-                    type="primary"
-                    icon={<EditOutlined />}
-                    size="small"
-                    onClick={() => selectedTopic && openTopicEdit(selectedTopic)}
-                  >
-                    编辑课题
-                  </Button>
-                  <Text type="secondary">
-                    牵头单位：{unitMap[selectedTopic?.leadingUnitId || ''] || selectedTopic?.leadingUnitId || '-'} |
-                    参与单位：{(selectedTopic?.participatingUnitIds || []).map((uid) => unitMap[uid] || uid).join('、')}
-                  </Text>
-                </Space>
-              </Card>
+          {renderTopicConfigTab()}
+        </Tabs.TabPane>
 
-              {/* Node selector */}
-              <Card size="small" style={{ marginBottom: 16 }}>
-                <Space>
-                  <Text strong>时间节点：</Text>
-                  <Radio.Group
-                    value={selectedNodeId}
-                    onChange={(e) => setSelectedNodeId(e.target.value)}
-                  >
-                    {sortedNodes.map((n) => (
-                      <Radio.Button key={n.id} value={n.id}>
-                        {n.name}（{n.deadline}）
-                      </Radio.Button>
-                    ))}
-                  </Radio.Group>
-                </Space>
-              </Card>
-
-              {/* Indicator matrix */}
-              {selectedNodeId && (
-                <Card
-                  title="指标分解矩阵"
-                  extra={
-                    <Space>
-                      <Button icon={<DownloadOutlined />} onClick={() => {
-                        const rows = matrixData.rows.map((row) => {
-                          const r: any = { 单位: row.unitName };
-                          ACHIEVEMENT_TYPES.forEach((type) => {
-                            r[type] = row.cells[type]?.plannedQuantity ?? matrixEdits[makeKey(row.unitId, type)] ?? 0;
-                          });
-                          return r;
-                        });
-                        exportToExcel(rows, `指标矩阵_${selectedTopic?.code}_${selectedNode?.name}`);
-                      }}>导出 Excel</Button>
-                      <Button type="primary" onClick={handleBatchSave}>批量保存</Button>
-                    </Space>
-                  }
-                >
-                  <Table
-                    rowKey="unitId"
-                    pagination={false}
-                    scroll={{ x: 800 }}
-                    dataSource={matrixData.rows}
-                    columns={[
-                      {
-                        title: '单位',
-                        dataIndex: 'unitName',
-                        key: 'unitName',
-                        width: 150,
-                        fixed: 'left' as const,
-                      },
-                      ...ACHIEVEMENT_TYPES.map((type) => ({
-                        title: type,
-                        key: type,
-                        width: 120,
-                        render: (_: any, row: any) => {
-                          const existing = row.cells[type];
-                          const editKey = makeKey(row.unitId, type);
-                          const val = editKey in matrixEdits ? matrixEdits[editKey] : (existing?.plannedQuantity ?? 0);
-                          return (
-                            <InputNumber
-                              min={0}
-                              value={val}
-                              size="small"
-                              style={{ width: '100%' }}
-                              onChange={(v) => handleMatrixCellChange(row.unitId, type, v)}
-                            />
-                          );
-                        },
-                      })),
-                    ]}
-                    summary={() => (
-                      <Table.Summary>
-                        <Table.Summary.Row>
-                          <Table.Summary.Cell index={0}>
-                            <Text strong>各单位合计</Text>
-                          </Table.Summary.Cell>
-                          {ACHIEVEMENT_TYPES.map((type) => (
-                            <Table.Summary.Cell key={type} index={ACHIEVEMENT_TYPES.indexOf(type) + 1}>
-                              <Text strong>{matrixData.totals[type] || 0}</Text>
-                            </Table.Summary.Cell>
-                          ))}
-                        </Table.Summary.Row>
-                      </Table.Summary>
-                    )}
-                  />
-                </Card>
-              )}
-
-              {/* Evidence rules reference */}
-              {selectedNodeId && (
-                <Card size="small" title="佐证材料认定规则" style={{ marginTop: 16 }}>
-                  <Space direction="vertical">
-                    {ACHIEVEMENT_TYPES.map((type) => {
-                      const def = ACHIEVEMENT_EVIDENCE_RULES[type];
-                      return (
-                        <Space key={type}>
-                          <Tag>{type}</Tag>
-                          <Text type="secondary">{def?.displayText || '-'}</Text>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            ({def?.rule.type === 'OR' ? '任一即可' : '全部必须'})
-                          </Text>
-                        </Space>
-                      );
-                    })}
-                  </Space>
-                </Card>
-              )}
-            </div>
-          )}
-        </TabPane>
-
-        {/* Tab 2: 时间节点配置 */}
-        <TabPane
+        <Tabs.TabPane
           tab={<span><TableOutlined /> 时间节点配置</span>}
           key="nodes"
         >
@@ -649,105 +560,179 @@ export function IndicatorConfigPage() {
               pagination={false}
             />
           </Card>
-        </TabPane>
+        </Tabs.TabPane>
 
-        {/* Tab 3: 国内期刊指标配置 */}
-        <TabPane
-          tab={<span><TableOutlined /> 国内期刊指标配置</span>}
-          key="domesticJournal"
+        <Tabs.TabPane
+          tab={<span><TableOutlined /> 指标分解</span>}
+          key="indicator-decompose"
         >
-          <Card
-            title="国内期刊论文配置"
-            extra={
-              <Button type="primary" onClick={handleSaveCJ}>保存配置</Button>
-            }
-          >
-            <Form form={cjForm} layout="vertical">
-              <Form.Item label="启用国内期刊要求" name="enabled" valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Form.Item label="统计范围" name="statisticsScope">
-                <Select style={{ width: '100%' }}>
-                  <Option value="代表性论文">代表性论文</Option>
-                </Select>
-              </Form.Item>
-              <Form.Item label="考核层级" name="assessmentLevel">
-                <Select style={{ width: '100%' }}>
-                  <Option value="项目总体">项目总体</Option>
-                  <Option value="项目及课题">项目及课题</Option>
-                </Select>
-              </Form.Item>
-              <Form.Item label="最低国内期刊比例（%）" name="minRatio">
-                <InputNumber min={0} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label="最低国内期刊数量" name="minCount">
-                <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item label="分解到各课题" name="decomposeToTopics" valuePropName="checked">
-                <Switch />
-              </Form.Item>
+          {/* Topic selector */}
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space>
+              <Text strong>选择课题：</Text>
+              <Select
+                placeholder="请选择课题"
+                style={{ width: 400 }}
+                value={selectedTopicId || undefined}
+                onChange={(v) => {
+                  setSelectedTopicId(v || '');
+                  setSelectedNodeId('');
+                  setMatrixEdits({});
+                }}
+                allowClear
+              >
+                {topics.map((t) => (
+                  <Option key={t.id} value={t.id}>{t.code} {t.name}</Option>
+                ))}
+              </Select>
 
-              {decomposeToTopics && (
-                <Card title="各课题最低国内期刊数量" size="small" style={{ marginBottom: 16 }}>
-                  {topics.map((t) => (
-                    <Form.Item key={t.id} label={t.name} name={`topicMin_${t.id}`}>
-                      <InputNumber min={0} style={{ width: '100%' }} />
-                    </Form.Item>
-                  ))}
-                </Card>
+              {selectedTopic && sortedNodes.length > 0 && (
+                <>
+                  <Text strong>时间节点：</Text>
+                  <Radio.Group
+                    value={selectedNodeId}
+                    onChange={(e) => {
+                      setSelectedNodeId(e.target.value);
+                      setMatrixEdits({});
+                        }}
+                  >
+                    {sortedNodes.map((n) => (
+                      <Radio.Button key={n.id} value={n.id}>
+                        {n.name}（{n.deadline}）
+                      </Radio.Button>
+                    ))}
+                  </Radio.Group>
+                </>
               )}
-
-              <Form.Item label="备注" name="remarks">
-                <TextArea rows={3} />
-              </Form.Item>
-            </Form>
-          </Card>
-        </TabPane>
-
-        {/* Tab 4: 操作记录 */}
-        <TabPane
-          tab={<span><HistoryOutlined /> 操作记录</span>}
-          key="operationRecords"
-        >
-          <Card title="操作记录">
-            <Space style={{ marginBottom: 16 }} wrap>
-              <Select
-                placeholder="模块"
-                allowClear
-                style={{ width: 180 }}
-                onChange={(v) => setOpFilter({ ...opFilter, module: v || '' })}
-              >
-                <Option value="课题及指标配置">课题及指标配置</Option>
-                <Option value="时间节点配置">时间节点配置</Option>
-                <Option value="国内期刊指标配置">国内期刊指标配置</Option>
-              </Select>
-              <Select
-                placeholder="操作类型"
-                allowClear
-                style={{ width: 140 }}
-                onChange={(v) => setOpFilter({ ...opFilter, operationType: v || '' })}
-              >
-                <Option value="新增">新增</Option>
-                <Option value="修改">修改</Option>
-                <Option value="删除">删除</Option>
-                <Option value="导入">导入</Option>
-                <Option value="批量修改">批量修改</Option>
-              </Select>
-              <Input
-                placeholder="关键词搜索"
-                style={{ width: 200 }}
-                value={opFilter.keyword}
-                onChange={(e) => setOpFilter({ ...opFilter, keyword: e.target.value })}
-              />
             </Space>
-            <Table
-              rowKey="id"
-              columns={opColumns}
-              dataSource={[...filteredOps].sort((a, b) => b.operatedAt.localeCompare(a.operatedAt))}
-              pagination={{ pageSize: 10 }}
-            />
           </Card>
-        </TabPane>
+
+          {/* Topic info banner - READ ONLY */}
+          {selectedTopic && (
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <Space direction="vertical" size={4}>
+                <Text strong>{selectedTopic.code} {selectedTopic.name}</Text>
+                <Space size="large" wrap>
+                  <Text type="secondary">牵头单位：{unitMap[selectedTopic.leadingUnitId] || selectedTopic.leadingUnitId || '-'}</Text>
+                  <Text type="secondary">参与单位：{selectedTopic.participatingUnitIds.map((uid) => unitMap[uid] || uid).join('、') || '-'}</Text>
+                  <Text type="secondary">负责人：{selectedTopic.principalName || '-'}</Text>
+                  <Text type="secondary">联系人：{selectedTopic.contactName || '-'}（{selectedTopic.contactPhone || ''}{selectedTopic.contactEmail ? ` / ${selectedTopic.contactEmail}` : ''}）</Text>
+                </Space>
+                <Space size="large">
+                  <Text type="secondary">知识产权要求：{getTopicIPSummary(selectedTopic.id)}</Text>
+                  <Text type="secondary">国内期刊要求：{selectedTopic.domesticJournalRequiredCount || 0} 篇</Text>
+                </Space>
+              </Space>
+            </Card>
+          )}
+
+          {/* TopicNodeTarget row + Indicator matrix */}
+          {selectedNodeId && selectedTopic && (
+            <Card
+              title="指标分解矩阵"
+              extra={
+                <Space>
+                  <Button icon={<DownloadOutlined />} onClick={() => {
+                    const rows = matrixData.rows.map((row) => {
+                      const r: any = { 单位: row.unitName };
+                      ACHIEVEMENT_TYPES.forEach((type) => {
+                        r[type] = row.cells[type]?.plannedQuantity ?? matrixEdits[makeKey(row.unitId, type)] ?? 0;
+                      });
+                      return r;
+                    });
+                    exportToExcel(rows, `指标矩阵_${selectedTopic?.code}_${selectedNode?.name}`);
+                  }}>导出 Excel</Button>
+                  <Button type="primary" onClick={handleBatchSave}>批量保存</Button>
+                </Space>
+              }
+            >
+              <Table
+                rowKey="unitId"
+                pagination={false}
+                scroll={{ x: 900 }}
+                dataSource={matrixData.rows}
+                columns={[
+                  {
+                    title: '单位',
+                    dataIndex: 'unitName',
+                    key: 'unitName',
+                    width: 150,
+                    fixed: 'left' as const,
+                  },
+                  ...ACHIEVEMENT_TYPES.map((type) => ({
+                    title: type,
+                    key: type,
+                    width: 120,
+                    render: (_: any, row: any) => {
+                      const existing = row.cells[type];
+                      const editKey = makeKey(row.unitId, type);
+                      const val = editKey in matrixEdits ? matrixEdits[editKey] : (existing?.plannedQuantity ?? 0);
+                      return (
+                        <InputNumber
+                          min={0}
+                          value={val}
+                          size="small"
+                          style={{ width: '100%' }}
+                          onChange={(v) => handleMatrixCellChange(row.unitId, type, v)}
+                        />
+                      );
+                    },
+                  })),
+                ]}
+                summary={() => (
+                  <Table.Summary>
+                    <Table.Summary.Row>
+                      <Table.Summary.Cell index={0}>
+                        <Text strong>各单位合计</Text>
+                      </Table.Summary.Cell>
+                      {ACHIEVEMENT_TYPES.map((type) => (
+                        <Table.Summary.Cell key={type} index={ACHIEVEMENT_TYPES.indexOf(type) + 1}>
+                          <Text strong>{matrixData.totals[type] || 0}</Text>
+                        </Table.Summary.Cell>
+                      ))}
+                    </Table.Summary.Row>
+                    <Table.Summary.Row>
+                      <Table.Summary.Cell index={0}>
+                        <Text strong type="warning">课题总指标</Text>
+                      </Table.Summary.Cell>
+                      {ACHIEVEMENT_TYPES.map((type) => {
+                        const currentTarget = currentNodeTargets.find((t) => t.achievementType === type);
+                        const overallReq = selectedTopic?.topicOverallRequirements?.[type] ?? 0;
+                        const val = currentTarget?.targetQuantity ?? overallReq;
+                        return (
+                          <Table.Summary.Cell key={type} index={ACHIEVEMENT_TYPES.indexOf(type) + 1}>
+                            <Text strong>{val}</Text>
+                          </Table.Summary.Cell>
+                        );
+                      })}
+                    </Table.Summary.Row>
+                    <Table.Summary.Row>
+                      <Table.Summary.Cell index={0}>
+                        <Text type="danger">差值（缺口）</Text>
+                      </Table.Summary.Cell>
+                      {ACHIEVEMENT_TYPES.map((type) => {
+                        const currentTarget = currentNodeTargets.find((t) => t.achievementType === type);
+                        const overallReq = selectedTopic?.topicOverallRequirements?.[type] ?? 0;
+                        const targetVal = currentTarget?.targetQuantity ?? overallReq;
+                        const unitTotal = matrixData.totals[type] || 0;
+                        const gap = targetVal - unitTotal;
+                        return (
+                          <Table.Summary.Cell key={type} index={ACHIEVEMENT_TYPES.indexOf(type) + 1}>
+                            <Text type={gap !== 0 ? 'danger' : undefined} strong>
+                              {gap > 0 ? `-${gap}` : gap < 0 ? `+${Math.abs(gap)}` : '0'}
+                            </Text>
+                          </Table.Summary.Cell>
+                        );
+                      })}
+                    </Table.Summary.Row>
+                  </Table.Summary>
+                )}
+              />
+            </Card>
+          )}
+
+        </Tabs.TabPane>
+
       </Tabs>
 
       {/* Node Form Modal */}
@@ -779,37 +764,180 @@ export function IndicatorConfigPage() {
           </Form.Item>
         </Form>
       </Modal>
-
-      {/* 课题编辑弹窗 */}
-      <Modal
-        title="编辑课题信息"
-        open={topicEditVisible}
-        onOk={() => topicForm.submit()}
-        onCancel={() => {
-          setTopicEditVisible(false);
-          setEditingTopic(null);
-          topicForm.resetFields();
-        }}
-        width={600}
-      >
-        <Form form={topicForm} layout="vertical" onFinish={handleSaveTopic}>
-          <Form.Item label="课题编号" name="code" rules={[{ required: true, message: '请输入课题编号' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="课题名称" name="name" rules={[{ required: true, message: '请输入课题名称' }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item label="课题牵头单位" name="leadingUnitId" rules={[{ required: true, message: '请输入牵头单位' }]}>
-            <Input placeholder="请输入牵头单位名称" />
-          </Form.Item>
-          <Form.Item label="课题参与单位" name="participatingUnitIds" help="多个单位用逗号分隔">
-            <TextArea rows={3} placeholder="输入参与单位名称，多个用逗号分隔" />
-          </Form.Item>
-          <Form.Item label="备注" name="remarks">
-            <TextArea rows={2} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
+  );
+}
+
+// ---- Section Components for Topic Drawer ----
+
+function Section1BasicInfo({ topic, onSave }: { topic: Topic; onSave: (values: any) => void }) {
+  const [form] = Form.useForm();
+
+  const handleSubmit = () => {
+    form.validateFields().then((values) => {
+      onSave(values);
+    });
+  };
+
+  return (
+    <Form
+      form={form}
+      layout="vertical"
+      initialValues={{
+        code: topic.code,
+        name: topic.name,
+        principalName: topic.principalName || '',
+        contactName: topic.contactName || '',
+        contactPhone: topic.contactPhone || '',
+        contactEmail: topic.contactEmail || '',
+        financeAssistant: topic.financeAssistant || '',
+        financeAssistantEmail: topic.financeAssistantEmail || '',
+        financeAssistantPhone: topic.financeAssistantPhone || '',
+        remarks: topic.remarks || '',
+      }}
+    >
+      <Form.Item label="课题编号" name="code" rules={[{ required: true }]}>
+        <Input />
+      </Form.Item>
+      <Form.Item label="课题名称" name="name" rules={[{ required: true }]}>
+        <Input />
+      </Form.Item>
+      <Form.Item label="课题负责人" name="principalName">
+        <Input placeholder="请输入课题负责人姓名" />
+      </Form.Item>
+      <Form.Item label="课题联系人" name="contactName">
+        <Input placeholder="请输入联系人姓名" />
+      </Form.Item>
+      <Form.Item label="课题联系人手机" name="contactPhone">
+        <Input placeholder="请输入联系人手机" />
+      </Form.Item>
+      <Form.Item label="课题联系人邮箱" name="contactEmail">
+        <Input placeholder="请输入联系人邮箱" />
+      </Form.Item>
+      <Form.Item label="课题财务助理" name="financeAssistant">
+        <Input placeholder="请输入财务助理姓名" />
+      </Form.Item>
+      <Form.Item label="财务助理邮箱" name="financeAssistantEmail">
+        <Input placeholder="请输入财务助理邮箱" />
+      </Form.Item>
+      <Form.Item label="财务助理手机" name="financeAssistantPhone">
+        <Input placeholder="请输入财务助理手机" />
+      </Form.Item>
+      <Form.Item label="备注" name="remarks">
+        <TextArea rows={2} />
+      </Form.Item>
+      <Button type="primary" onClick={handleSubmit}>保存基本信息</Button>
+    </Form>
+  );
+}
+
+function Section2Units({ topic, onSave }: { topic: Topic; onSave: (values: any) => void }) {
+  const [form] = Form.useForm();
+
+  const handleSubmit = () => {
+    form.validateFields().then((values) => {
+      onSave(values);
+    });
+  };
+
+  return (
+    <Form
+      form={form}
+      layout="vertical"
+      initialValues={{
+        leadingUnit: topic.leadingUnitId,
+        participatingUnits: topic.participatingUnitIds.join('、'),
+      }}
+    >
+      <Form.Item label="牵头单位" name="leadingUnit" rules={[{ required: true, message: '请输入牵头单位' }]}>
+        <Input placeholder="请输入牵头单位名称" />
+      </Form.Item>
+      <Form.Item label="参与单位" name="participatingUnits" help="多个单位用顿号或逗号分隔">
+        <TextArea rows={3} placeholder="请输入参与单位名称，多个用顿号分隔" />
+      </Form.Item>
+      <Button type="primary" onClick={handleSubmit}>保存参与单位</Button>
+    </Form>
+  );
+}
+
+function Section3TopicReq({ topic, onSave }: { topic: Topic; onSave: (values: any) => void }) {
+  const [form] = Form.useForm();
+
+  const handleSubmit = () => {
+    form.validateFields().then((values) => {
+      onSave(values);
+    });
+  };
+
+  const overallReqs = topic.topicOverallRequirements || {};
+
+  return (
+    <Form
+      form={form}
+      layout="vertical"
+      initialValues={{
+        ...Object.fromEntries(ACHIEVEMENT_TYPES.map((t) => [`req_${t}`, overallReqs[t] ?? 0])),
+        domesticJournalRequiredCount: topic.domesticJournalRequiredCount || 0,
+      }}
+    >
+      {ACHIEVEMENT_TYPES.map((type) => (
+        <Form.Item key={type} label={`${type}要求数量`} name={`req_${type}`}>
+          <InputNumber min={0} style={{ width: '100%' }} />
+        </Form.Item>
+      ))}
+      <Form.Item label="国内期刊论文要求（篇）" name="domesticJournalRequiredCount">
+        <InputNumber min={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Button type="primary" onClick={handleSubmit}>保存成果要求</Button>
+    </Form>
+  );
+}
+
+function Section4PowerGrid({ powerGridReqs, onSave }: { topic: Topic; powerGridReqs: import('../../types').TopicPowerGridRequirement[]; onSave: (values: any[]) => void }) {
+  const [form] = Form.useForm();
+  const reqMap = Object.fromEntries(powerGridReqs.map((r) => [r.achievementType, r]));
+
+  const handleSubmit = () => {
+    form.validateFields().then(() => {
+      const values = form.getFieldsValue();
+      const result = POWER_GRID_TYPES.map((type) => ({
+        achievementType: type,
+        requiredCount: values[`pg_count_${type}`] ?? 0,
+      }));
+      onSave(result);
+    });
+  };
+
+  return (
+    <Form
+      form={form}
+      layout="vertical"
+      initialValues={(() => {
+        const obj: Record<string, any> = {};
+        POWER_GRID_TYPES.forEach((type) => {
+          obj[`pg_count_${type}`] = reqMap[type]?.requiredCount ?? 0;
+        });
+        return obj;
+      })()}
+    >
+      <Table
+        rowKey="type"
+        pagination={false}
+        dataSource={POWER_GRID_TYPES.map((type) => ({ type, label: type }))}
+        columns={[
+          { title: '成果类型', dataIndex: 'label', key: 'label', width: 120 },
+          {
+            title: '电网公司主导要求',
+            key: 'count',
+            render: (_: any, record: { type: string }) => (
+              <Form.Item name={`pg_count_${record.type}`} style={{ margin: 0 }}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            ),
+          },
+        ]}
+      />
+      <Button type="primary" onClick={handleSubmit} style={{ marginTop: 16 }}>保存电网公司成果要求</Button>
+    </Form>
   );
 }
